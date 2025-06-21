@@ -336,7 +336,7 @@ class Tool(Base):
     @execution_count.expression
     # method is intentionally a class-level expression, so no `self`
     # pylint: disable=no-self-argument
-    def execution_count(cls):
+    def _execution_count_expression(cls):
         """
         SQL expression to compute the execution count for the tool.
 
@@ -960,7 +960,7 @@ class Gateway(Base):
 
     # Authorizations
     auth_type: Mapped[Optional[str]] = mapped_column(default=None)  # "basic", "bearer", "headers" or None
-    auth_value: Mapped[Optional[Dict[str, str]]] = mapped_column(JSON)
+    auth_value: Mapped[Optional[str]] = mapped_column(String, nullable=True) # Stored as encoded string
 
 
 class SessionRecord(Base):

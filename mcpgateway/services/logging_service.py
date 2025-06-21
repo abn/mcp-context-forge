@@ -108,7 +108,7 @@ class LoggingService:
             },
         }
         if logger_name:
-            message["data"]["logger"] = logger_name
+            message["data"]["logger"] = logger_name # type: ignore[index]
 
         # Log through standard logging
         logger = self.get_logger(logger_name or "")

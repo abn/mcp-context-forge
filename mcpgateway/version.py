@@ -179,8 +179,9 @@ def _system_metrics() -> Dict[str, Any]:
     swap = psutil.swap_memory()
 
     # Load average (Unix); on Windows returns (None, None, None)
+    load: tuple[Optional[float], Optional[float], Optional[float]]
     try:
-        load = tuple(round(x, 2) for x in os.getloadavg())
+        load = tuple(round(x, 2) for x in os.getloadavg()) # type: ignore[assignment]
     except (AttributeError, OSError):
         load = (None, None, None)
 

@@ -10,15 +10,18 @@ Authors: Mihai Criveti
 import asyncio
 import os
 from urllib.parse import urlparse
+from pathlib import Path
+from typing import Any, List
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from mcpgateway.config import settings
 from mcpgateway.services.root_service import RootService, RootServiceError
 
 
 @pytest.mark.asyncio
-async def test_add_root_file_uri_and_name(tmp_path):
+async def test_add_root_file_uri_and_name(tmp_path: Path) -> None:
     service = RootService()
     # Add a filesystem path without a scheme
     dir_path = tmp_path / "mydir"
@@ -34,7 +37,7 @@ async def test_add_root_file_uri_and_name(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_add_root_with_scheme():
+async def test_add_root_with_scheme() -> None:
     service = RootService()
     # Add an HTTP URI
     uri = "http://example.com/base/path"
@@ -47,7 +50,7 @@ async def test_add_root_with_scheme():
 
 
 @pytest.mark.asyncio
-async def test_add_root_duplicate_raises():
+async def test_add_root_duplicate_raises() -> None:
     service = RootService()
     uri = "http://example.com/foo"
     await service.add_root(uri)
@@ -59,7 +62,7 @@ async def test_add_root_duplicate_raises():
 
 
 @pytest.mark.asyncio
-async def test_remove_root_and_list():
+async def test_remove_root_and_list() -> None:
     service = RootService()
     uri = "http://example.com/to-remove"
     await service.add_root(uri)
@@ -76,7 +79,7 @@ async def test_remove_root_and_list():
 
 
 @pytest.mark.asyncio
-async def test_remove_nonexistent_root_raises():
+async def test_remove_nonexistent_root_raises() -> None:
     service = RootService()
     with pytest.raises(RootServiceError) as excinfo:
         await service.remove_root("http://no.such.root")
@@ -86,7 +89,7 @@ async def test_remove_nonexistent_root_raises():
 
 
 @pytest.mark.asyncio
-async def test_initialize_adds_default_roots(monkeypatch):
+async def test_initialize_adds_default_roots(monkeypatch: MonkeyPatch) -> None:
     # Monkeypatch default_roots in settings
     monkeypatch.setattr(settings, "default_roots", ["http://a.com", "local/path"])
     service = RootService()
@@ -99,13 +102,15 @@ async def test_initialize_adds_default_roots(monkeypatch):
     await service.shutdown()
 
 
+from typing import Any, List
+
 @pytest.mark.asyncio
-async def test_subscribe_changes_receives_events():
+async def test_subscribe_changes_receives_events() -> None:
     service = RootService()
     # Start subscription
-    events = []
+    events: List[Any] = []
 
-    async def subscriber():
+    async def subscriber() -> None:
         async for ev in service.subscribe_changes():
             events.append(ev)
             if len(events) >= 2:

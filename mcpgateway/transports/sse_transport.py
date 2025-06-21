@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict
+from typing import Any, AsyncGenerator, Dict, Optional # Ensured Optional is here
 
 from fastapi import Request
 from sse_starlette.sse import EventSourceResponse
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class SSETransport(Transport):
     """Transport implementation using Server-Sent Events with proper session management."""
 
-    def __init__(self, base_url: str = None):
+    def __init__(self, base_url: Optional[str] = None): # Changed str to Optional[str]
         """Initialize SSE transport.
 
         Args:
@@ -36,7 +36,7 @@ class SSETransport(Transport):
         """
         self._base_url = base_url or f"http://{settings.host}:{settings.port}"
         self._connected = False
-        self._message_queue = asyncio.Queue()
+        self._message_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         self._client_gone = asyncio.Event()
         self._session_id = str(uuid.uuid4())
 
@@ -74,7 +74,7 @@ class SSETransport(Transport):
             logger.error(f"Failed to queue message: {e}")
             raise
 
-    async def receive_message(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def receive_message(self) -> AsyncGenerator[Dict[str, Any], None]: # type: ignore[override]
         """Receive messages from the client over SSE transport.
 
         This method implements a continuous message-receiving pattern for SSE transport.
@@ -99,12 +99,8 @@ class SSETransport(Transport):
         if not self._connected:
             raise RuntimeError("Transport not connected")
 
-        # For SSE, we set up a loop to wait for messages which are delivered via POST
-        # Most messages come via the POST endpoint, but we yield an initial initialize placeholder
-        # to keep the receive loop running
         yield {"jsonrpc": "2.0", "method": "initialize", "id": 1}
 
-        # Continue waiting for cancellation
         try:
             while not self._client_gone.is_set():
                 await asyncio.sleep(1.0)
@@ -115,65 +111,37 @@ class SSETransport(Transport):
             logger.info(f"SSE receive loop ended for session {self._session_id}")
 
     async def is_connected(self) -> bool:
-        """Check if transport is connected.
-
-        Returns:
-            True if connected
-        """
         return self._connected
 
     async def create_sse_response(self, _request: Request) -> EventSourceResponse:
-        """Create SSE response for streaming.
-
-        Args:
-            _request: FastAPI request
-
-        Returns:
-            SSE response object
-        """
         endpoint_url = f"{self._base_url}/message?session_id={self._session_id}"
 
-        async def event_generator():
-            """Generate SSE events.
-
-            Yields:
-                SSE event
-            """
-            # Send the endpoint event first
+        async def event_generator() -> AsyncGenerator[Dict[str, Any], None]:
             yield {
                 "event": "endpoint",
                 "data": endpoint_url,
                 "retry": settings.sse_retry_timeout,
             }
-
-            # Send keepalive immediately to help establish connection
             yield {
                 "event": "keepalive",
                 "data": "{}",
                 "retry": settings.sse_retry_timeout,
             }
-
             try:
                 while not self._client_gone.is_set():
                     try:
-                        # Wait for messages with a timeout for keepalives
                         message = await asyncio.wait_for(
                             self._message_queue.get(),
-                            timeout=30.0,  # 30 second timeout for keepalives (some tools require more timeout for execution)
+                            timeout=30.0,
                         )
-
                         data = json.dumps(message, default=lambda obj: (obj.strftime("%Y-%m-%d %H:%M:%S") if isinstance(obj, datetime) else TypeError("Type not serializable")))
-
-                        # logger.info(f"Sending SSE message: {data[:100]}...")
                         logger.debug(f"Sending SSE message: {data}")
-
                         yield {
                             "event": "message",
                             "data": data,
                             "retry": settings.sse_retry_timeout,
                         }
                     except asyncio.TimeoutError:
-                        # Send keepalive on timeout
                         yield {
                             "event": "keepalive",
                             "data": "{}",
@@ -192,7 +160,6 @@ class SSETransport(Transport):
                 logger.error(f"SSE event generator error: {e}")
             finally:
                 logger.info(f"SSE event generator completed: {self._session_id}")
-                # We intentionally don't set client_gone here to allow queued messages to be processed
 
         return EventSourceResponse(
             event_generator(),
@@ -206,25 +173,8 @@ class SSETransport(Transport):
         )
 
     async def _client_disconnected(self, _request: Request) -> bool:
-        """Check if client has disconnected.
-
-        Args:
-            _request: FastAPI Request object
-
-        Returns:
-            bool: True if client disconnected
-        """
-        # We only check our internal client_gone flag
-        # We intentionally don't check connection_lost on the request
-        # as it can be unreliable and cause premature closures
         return self._client_gone.is_set()
 
     @property
     def session_id(self) -> str:
-        """
-        Get the session ID for this transport.
-
-        Returns:
-            str: session_id
-        """
         return self._session_id

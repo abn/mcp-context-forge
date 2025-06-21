@@ -9,12 +9,13 @@ Tests for the Gateway Service implementation.
 """
 
 from unittest.mock import AsyncMock, MagicMock, Mock
+from typing import List
 
 import pytest
 
 from mcpgateway.db import Gateway as DbGateway
 from mcpgateway.db import Tool as DbTool
-from mcpgateway.schemas import GatewayCreate, GatewayUpdate
+from mcpgateway.schemas import GatewayCreate, GatewayUpdate, ToolCreate # Added ToolCreate
 from mcpgateway.services.gateway_service import (
     GatewayConnectionError,
     GatewayError,
@@ -25,7 +26,7 @@ from mcpgateway.services.gateway_service import (
 
 
 @pytest.fixture
-def gateway_service():
+def gateway_service() -> GatewayService:
     """Create a gateway service instance."""
     service = GatewayService()
     service._http_client = AsyncMock()
@@ -33,7 +34,7 @@ def gateway_service():
 
 
 @pytest.fixture
-def mock_gateway():
+def mock_gateway() -> MagicMock:
     """Create a mock gateway model."""
     gateway = MagicMock(spec=DbGateway)
     gateway.id = 1
@@ -65,7 +66,7 @@ class TestGatewayService:
     """Tests for the GatewayService class."""
 
     @pytest.mark.asyncio
-    async def test_register_gateway(self, gateway_service, test_db):
+    async def test_register_gateway(self, gateway_service: GatewayService, test_db: MagicMock) -> None:
         """Test successful gateway registration."""
         # Set up DB behavior
         mock_scalar = Mock()
@@ -76,8 +77,8 @@ class TestGatewayService:
         test_db.refresh = Mock()
 
         # Set up gateway service methods
-        gateway_service._notify_gateway_added = AsyncMock()
-        gateway_service._initialize_gateway = AsyncMock(
+        gateway_service._notify_gateway_added = AsyncMock() # type: ignore[method-assign]
+        gateway_service._initialize_gateway = AsyncMock( # type: ignore[method-assign]
             return_value=(
                 {
                     "prompts": {"listChanged": True},
@@ -112,7 +113,9 @@ class TestGatewayService:
         assert result.is_active is True
 
     @pytest.mark.asyncio
-    async def test_register_gateway_name_conflict(self, gateway_service, mock_gateway, test_db):
+    async def test_register_gateway_name_conflict(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test gateway registration with name conflict."""
         # Mock DB to return existing gateway
         mock_scalar = Mock()
@@ -132,7 +135,9 @@ class TestGatewayService:
         assert exc_info.value.gateway_id == mock_gateway.id
 
     @pytest.mark.asyncio
-    async def test_register_gateway_connection_error(self, gateway_service, test_db):
+    async def test_register_gateway_connection_error(
+        self, gateway_service: GatewayService, test_db: MagicMock
+    ) -> None:
         """Test gateway registration with connection error."""
         # Set up DB behavior
         mock_scalar = Mock()
@@ -141,7 +146,7 @@ class TestGatewayService:
         test_db.rollback = Mock()
 
         # Set up gateway service methods to fail initialization
-        gateway_service._initialize_gateway = AsyncMock(side_effect=GatewayConnectionError("Failed to connect"))
+        gateway_service._initialize_gateway = AsyncMock(side_effect=GatewayConnectionError("Failed to connect")) # type: ignore[method-assign]
 
         # Create gateway request
         gateway_create = GatewayCreate(name="test_gateway", url="http://example.com/gateway", description="A test gateway")
@@ -156,7 +161,9 @@ class TestGatewayService:
         test_db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_gateways(self, gateway_service, mock_gateway, test_db):
+    async def test_list_gateways(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test listing gateways."""
         # Mock DB to return a list of gateways
         mock_scalar_result = MagicMock()
@@ -177,7 +184,9 @@ class TestGatewayService:
         assert result[0].is_active is True
 
     @pytest.mark.asyncio
-    async def test_get_gateway(self, gateway_service, mock_gateway, test_db):
+    async def test_get_gateway(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting a gateway by ID."""
         # Mock DB get to return gateway
         test_db.get = Mock(return_value=mock_gateway)
@@ -196,7 +205,7 @@ class TestGatewayService:
         assert result.capabilities == mock_gateway.capabilities
 
     @pytest.mark.asyncio
-    async def test_get_gateway_not_found(self, gateway_service, test_db):
+    async def test_get_gateway_not_found(self, gateway_service: GatewayService, test_db: MagicMock) -> None:
         """Test getting a non-existent gateway."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -208,7 +217,9 @@ class TestGatewayService:
         assert "Gateway not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_get_gateway_inactive(self, gateway_service, mock_gateway, test_db):
+    async def test_get_gateway_inactive(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting an inactive gateway."""
         # Set gateway to inactive
         mock_gateway.is_active = False
@@ -223,7 +234,9 @@ class TestGatewayService:
         assert "Gateway 'test_gateway' exists but is inactive" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_update_gateway(self, gateway_service, mock_gateway, test_db):
+    async def test_update_gateway(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a gateway."""
         # Mock DB get to return gateway
         test_db.get = Mock(return_value=mock_gateway)
@@ -237,8 +250,8 @@ class TestGatewayService:
         test_db.refresh = Mock()
 
         # Set up gateway service methods
-        gateway_service._notify_gateway_updated = AsyncMock()
-        gateway_service._initialize_gateway = AsyncMock(
+        gateway_service._notify_gateway_updated = AsyncMock() # type: ignore[method-assign]
+        gateway_service._initialize_gateway = AsyncMock( # type: ignore[method-assign]
             return_value=(
                 {
                     "prompts": {"listChanged": True, "subscribe": True},
@@ -276,7 +289,7 @@ class TestGatewayService:
         assert result.description == "An updated gateway"
 
     @pytest.mark.asyncio
-    async def test_update_gateway_not_found(self, gateway_service, test_db):
+    async def test_update_gateway_not_found(self, gateway_service: GatewayService, test_db: MagicMock) -> None:
         """Test updating a non-existent gateway."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -291,7 +304,9 @@ class TestGatewayService:
         assert "Gateway not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_update_gateway_name_conflict(self, gateway_service, mock_gateway, test_db):
+    async def test_update_gateway_name_conflict(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a gateway with a name that conflicts with another gateway."""
         # Create a second gateway (the one being updated)
         gateway1 = mock_gateway
@@ -327,7 +342,9 @@ class TestGatewayService:
         assert exc_info.value.gateway_id == gateway2.id
 
     @pytest.mark.asyncio
-    async def test_toggle_gateway_status(self, gateway_service, mock_gateway, test_db):
+    async def test_toggle_gateway_status(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test toggling gateway active status."""
         # Mock DB get to return gateway
         test_db.get = Mock(return_value=mock_gateway)
@@ -335,9 +352,9 @@ class TestGatewayService:
         test_db.refresh = Mock()
 
         # Set up service methods
-        gateway_service._notify_gateway_activated = AsyncMock()
-        gateway_service._notify_gateway_deactivated = AsyncMock()
-        gateway_service._initialize_gateway = AsyncMock(
+        gateway_service._notify_gateway_activated = AsyncMock() # type: ignore[method-assign]
+        gateway_service._notify_gateway_deactivated = AsyncMock() # type: ignore[method-assign]
+        gateway_service._initialize_gateway = AsyncMock( # type: ignore[method-assign]
             return_value=(
                 {
                     "prompts": {"listChanged": True},
@@ -374,7 +391,9 @@ class TestGatewayService:
         assert result.is_active is False
 
     @pytest.mark.asyncio
-    async def test_delete_gateway(self, gateway_service, mock_gateway, test_db):
+    async def test_delete_gateway(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test deleting a gateway."""
         # Mock DB get to return gateway
         test_db.get = Mock(return_value=mock_gateway)
@@ -388,7 +407,7 @@ class TestGatewayService:
         filter_mock.delete.return_value = None
 
         # Set up service methods
-        gateway_service._notify_gateway_deleted = AsyncMock()
+        gateway_service._notify_gateway_deleted = AsyncMock() # type: ignore[method-assign]
 
         # Call method
         await gateway_service.delete_gateway(test_db, 1)
@@ -402,7 +421,7 @@ class TestGatewayService:
         gateway_service._notify_gateway_deleted.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_gateway_not_found(self, gateway_service, test_db):
+    async def test_delete_gateway_not_found(self, gateway_service: GatewayService, test_db: MagicMock) -> None:
         """Test deleting a non-existent gateway."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -414,7 +433,7 @@ class TestGatewayService:
         assert "Gateway not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_forward_request(self, gateway_service, mock_gateway):
+    async def test_forward_request(self, gateway_service: GatewayService, mock_gateway: MagicMock) -> None:
         """Test forwarding a request to a gateway."""
         # Set up HTTP client response
         mock_response = AsyncMock()
@@ -429,7 +448,7 @@ class TestGatewayService:
         gateway_service._http_client.post.assert_called_once_with(
             f"{mock_gateway.url}/rpc",
             json={"jsonrpc": "2.0", "id": 1, "method": "test_method", "params": {"param": "value"}},
-            headers=gateway_service._get_auth_headers(),
+            headers=gateway_service._get_auth_headers(), # type: ignore[attr-defined]
         )
 
         # Verify result
@@ -439,7 +458,9 @@ class TestGatewayService:
         assert mock_gateway.last_seen is not None
 
     @pytest.mark.asyncio
-    async def test_forward_request_error_response(self, gateway_service, mock_gateway):
+    async def test_forward_request_error_response(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock
+    ) -> None:
         """Test forwarding a request that returns an error."""
         # Set up HTTP client response
         mock_response = AsyncMock()
@@ -454,7 +475,9 @@ class TestGatewayService:
         assert "Gateway error: Test error" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_forward_request_connection_error(self, gateway_service, mock_gateway):
+    async def test_forward_request_connection_error(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock
+    ) -> None:
         """Test forwarding a request with connection error."""
         # Set up HTTP client to raise exception
         gateway_service._http_client.post.side_effect = Exception("Connection error")
@@ -466,28 +489,48 @@ class TestGatewayService:
         assert "Failed to forward request" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_check_gateway_health(self, gateway_service, mock_gateway):
+    async def test_check_gateway_health(self, gateway_service: GatewayService, mock_gateway: MagicMock) -> None:
         """Test checking gateway health."""
-        # Set up _initialize_gateway to succeed
-        gateway_service._initialize_gateway = AsyncMock()
+        # Mock _initialize_gateway to simulate a successful health check
+        # _initialize_gateway now returns a tuple (capabilities_dict, tools_list)
+        mock_capabilities = {"test_cap": True}
+        mock_tools_list: List[ToolCreate] = []
+        gateway_service._initialize_gateway = AsyncMock(return_value=(mock_capabilities, mock_tools_list)) # type: ignore[method-assign]
 
-        # Call method
-        result = await gateway_service.check_gateway_health(mock_gateway)
+        mock_gateway.is_active = True # Ensure the gateway is considered for health check
 
-        # Verify result
-        assert result is True
+        # Call method with a list containing the mock gateway
+        # The method check_health_of_gateways iterates and updates last_seen on success.
+        # Its direct boolean return might not be the primary thing to assert for a single gateway check.
+        await gateway_service.check_health_of_gateways([mock_gateway])
 
-        # Verify gateway last_seen updated
+        # Verify _initialize_gateway was called
+        gateway_service._initialize_gateway.assert_called_once_with(mock_gateway.url, mock_gateway.auth_value, mock_gateway.transport)
+
+        # Verify gateway last_seen updated (indirectly indicates success for this gateway)
         assert mock_gateway.last_seen is not None
+        # Note: The overall return of check_health_of_gateways is True if no active gateways failed critically.
+        # For a single gateway success, this is fine.
 
     @pytest.mark.asyncio
-    async def test_check_gateway_health_failure(self, gateway_service, mock_gateway):
+    async def test_check_gateway_health_failure(
+        self, gateway_service: GatewayService, mock_gateway: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test checking gateway health with failure."""
-        # Set up _initialize_gateway to fail
-        gateway_service._initialize_gateway = AsyncMock(side_effect=Exception("Health check failed"))
+        gateway_service._initialize_gateway = AsyncMock(side_effect=GatewayConnectionError("Health check simulation failed")) # type: ignore[method-assign]
+        mock_gateway.is_active = True
+        mock_gateway.id = 1 # Ensure mock_gateway has an ID
 
-        # Call method
-        result = await gateway_service.check_gateway_health(mock_gateway)
+        # Mock _handle_gateway_failure to check if it's called, and to prevent side effects like db calls
+        gateway_service._handle_gateway_failure = AsyncMock() # type: ignore[method-assign]
 
-        # Verify result
-        assert result is False
+        # Call the method that performs health checks on a list of gateways
+        await gateway_service.check_health_of_gateways([mock_gateway])
+
+        # Verify _initialize_gateway was called (it should be, and then fail)
+        gateway_service._initialize_gateway.assert_called_once_with(
+            mock_gateway.url, mock_gateway.auth_value, mock_gateway.transport
+        )
+
+        # Verify that _handle_gateway_failure was called as a consequence of _initialize_gateway failing
+        gateway_service._handle_gateway_failure.assert_called_once_with(mock_gateway)

@@ -67,25 +67,35 @@ class LocalDiscoveryService:
         )
 
     def _get_local_addresses(self) -> List[str]:
-        """Get list of local network addresses.
+        """Get list of local network addresses, preferring non-localhost IPv4.
 
         Returns:
-            List of IP addresses
+            List of IP address strings.
         """
-        addresses = []
+        string_addresses: List[str] = []
         try:
-            # Get all network interfaces
-            for iface in socket.getaddrinfo(socket.gethostname(), None):
-                addr = iface[4][0]
-                # Skip localhost
-                if not addr.startswith("127."):
-                    addresses.append(addr)
+            # The fifth element of the tuple is the sockaddr
+            for iface_info in socket.getaddrinfo(socket.gethostname(), None):
+                sockaddr = iface_info[4]
+                # sockaddr[0] is the IP address string for both IPv4 and IPv6
+                addr_str = sockaddr[0]
+                if isinstance(addr_str, str):  # Ensure it's a string
+                    # Filter out loopback and link-local addresses more robustly
+                    is_loopback_ipv4 = addr_str.startswith("127.")
+                    is_loopback_ipv6 = addr_str == "::1"
+                    is_link_local_ipv6 = addr_str.startswith("fe80:")
+
+                    if not (is_loopback_ipv4 or is_loopback_ipv6 or is_link_local_ipv6):
+                        string_addresses.append(addr_str)
         except Exception as e:
             logger.warning(f"Failed to get local addresses: {e}")
-            # Fall back to localhost
-            addresses.append("127.0.0.1")
 
-        return addresses or ["127.0.0.1"]
+        # Remove duplicates by converting to set and back to list
+        # Note: this does not preserve order, but for IP addresses order is not critical.
+        if string_addresses:
+            return list(set(string_addresses))
+
+        return ["127.0.0.1"] # Fallback if no suitable addresses found
 
 
 class DiscoveryService(LocalDiscoveryService):

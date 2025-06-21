@@ -47,15 +47,30 @@ from mcpgateway.types import (
 PROTOCOL_VERSION = os.getenv("PROTOCOL_VERSION", "2025-03-26")
 
 
+from mcpgateway.schemas import (
+    AdminGatewayCreate,
+    AdminToolCreate,
+    EventMessage,
+    ServerCreate,
+    ServerMetrics,
+    ServerRead,
+    ServerUpdate,
+    StatusToggleRequest,
+    StatusToggleResponse,
+    ListFilters,
+)
+from datetime import timedelta
+from unittest.mock import Mock
+
 class TestMCPTypes:
     """Test suite for MCP protocol types."""
 
-    def test_role_enum(self):
+    def test_role_enum(self) -> None:
         """Test Role enum values."""
         assert Role.ASSISTANT == "assistant"
         assert Role.USER == "user"
 
-    def test_log_level_enum(self):
+    def test_log_level_enum(self) -> None:
         """Test LogLevel enum values."""
         assert LogLevel.DEBUG == "debug"
         assert LogLevel.INFO == "info"
@@ -66,7 +81,7 @@ class TestMCPTypes:
         assert LogLevel.ALERT == "alert"
         assert LogLevel.EMERGENCY == "emergency"
 
-    def test_text_content(self):
+    def test_text_content(self) -> None:
         """Test TextContent model."""
         content = TextContent(type="text", text="Hello, world!")
         assert content.type == "text"
@@ -80,9 +95,9 @@ class TestMCPTypes:
 
         # Test missing required field
         with pytest.raises(ValidationError):
-            TextContent(type="text")
+            TextContent(type="text") # type: ignore
 
-    def test_image_content(self):
+    def test_image_content(self) -> None:
         """Test ImageContent model."""
         content = ImageContent(
             type="image",
@@ -95,9 +110,9 @@ class TestMCPTypes:
 
         # Test validation errors
         with pytest.raises(ValidationError):
-            ImageContent(type="image", data=b"data")  # Missing mime_type
+            ImageContent(type="image", data=b"data") # type: ignore  # Missing mime_type
 
-    def test_resource_content(self):
+    def test_resource_content(self) -> None:
         """Test ResourceContent model."""
         # Text resource
         text_resource = ResourceContent(
@@ -136,7 +151,7 @@ class TestMCPTypes:
         assert minimal.text is None
         assert minimal.blob is None
 
-    def test_message(self):
+    def test_message(self) -> None:
         """Test Message model with different content types."""
         text_message = Message(
             role=Role.USER,
@@ -156,9 +171,9 @@ class TestMCPTypes:
         )
         assert image_message.role == Role.ASSISTANT
         assert image_message.content.type == "image"
-        assert image_message.content.data == b"binary_image_data"
+        assert image_message.content.data == b"binary_image_data" # type: ignore
 
-    def test_prompt_argument(self):
+    def test_prompt_argument(self) -> None:
         """Test PromptArgument model."""
         # Full argument
         arg = PromptArgument(
@@ -176,7 +191,7 @@ class TestMCPTypes:
         assert minimal.description is None
         assert minimal.required is False
 
-    def test_prompt_result(self):
+    def test_prompt_result(self) -> None:
         """Test PromptResult model."""
         result = PromptResult(
             messages=[
@@ -208,15 +223,15 @@ class TestMCPTypes:
         assert len(minimal.messages) == 1
         assert minimal.description is None
 
-    def test_tool_result(self):
+    def test_tool_result(self) -> None:
         """Test ToolResult model."""
         result = ToolResult(
             content=[
                 TextContent(type="text", text="Result data"),
                 ImageContent(
                     type="image",
-                    data=b"image_data",
-                    mime_type="image/jpeg",
+                    data=b"image_data", # type: ignore
+                    mime_type="image/jpeg", # type: ignore
                 ),
             ],
             is_error=False,
@@ -228,13 +243,13 @@ class TestMCPTypes:
 
         # Test error result
         error_result = ToolResult(
-            content=[TextContent(type="text", text="Error message")],
+            content=[TextContent(type="text", text="Error message")], # type: ignore
             is_error=True,
         )
         assert len(error_result.content) == 1
         assert error_result.is_error is True
 
-    def test_resource(self):
+    def test_resource(self) -> None:
         """Test Resource model."""
         resource = Resource(
             uri="file:///example.txt",
@@ -260,7 +275,7 @@ class TestMCPTypes:
         assert minimal.mime_type is None
         assert minimal.size is None
 
-    def test_resource_template(self):
+    def test_resource_template(self) -> None:
         """Test ResourceTemplate model."""
         template = ResourceTemplate(
             uri_template="file:///data/{user}/{file}",
@@ -283,10 +298,10 @@ class TestMCPTypes:
         assert minimal.description is None
         assert minimal.mime_type is None
 
-    def test_list_resource_templates_result(self):
+    def test_list_resource_templates_result(self) -> None:
         """Test ListResourceTemplatesResult model."""
         result = ListResourceTemplatesResult(
-            _meta={"version": "1.0"},
+            meta={"version": "1.0"},
             next_cursor="abc123",
             resource_templates=[
                 ResourceTemplate(
@@ -318,7 +333,7 @@ class TestMCPTypes:
         assert minimal.next_cursor is None
         assert len(minimal.resource_templates) == 1
 
-    def test_root(self):
+    def test_root(self) -> None:
         """Test Root model."""
         root = Root(
             uri="file:///data",
@@ -332,13 +347,13 @@ class TestMCPTypes:
         assert minimal.uri == "file:///logs"
         assert minimal.name is None
 
-    def test_implementation(self):
+    def test_implementation(self) -> None:
         """Test Implementation model."""
         impl = Implementation(name="Test Gateway", version="1.0.0")
         assert impl.name == "Test Gateway"
         assert impl.version == "1.0.0"
 
-    def test_model_hint(self):
+    def test_model_hint(self) -> None:
         """Test ModelHint model."""
         hint = ModelHint(name="gpt-4")
         assert hint.name == "gpt-4"
@@ -347,7 +362,7 @@ class TestMCPTypes:
         empty = ModelHint()
         assert empty.name is None
 
-    def test_model_preferences(self):
+    def test_model_preferences(self) -> None:
         """Test ModelPreferences model."""
         prefs = ModelPreferences(
             cost_priority=0.8,
@@ -380,7 +395,7 @@ class TestMCPTypes:
                 intelligence_priority=0.5,
             )
 
-    def test_client_capabilities(self):
+    def test_client_capabilities(self) -> None:
         """Test ClientCapabilities model."""
         caps = ClientCapabilities(
             roots={"listChanged": True},
@@ -397,7 +412,7 @@ class TestMCPTypes:
         assert minimal.sampling is None
         assert minimal.experimental is None
 
-    def test_server_capabilities(self):
+    def test_server_capabilities(self) -> None:
         """Test ServerCapabilities model."""
         caps = ServerCapabilities(
             prompts={"listChanged": True},
@@ -420,7 +435,7 @@ class TestMCPTypes:
         assert minimal.logging is None
         assert minimal.experimental is None
 
-    def test_initialize_request(self):
+    def test_initialize_request(self) -> None:
         """Test InitializeRequest model."""
         request = InitializeRequest(
             protocol_version=PROTOCOL_VERSION,
@@ -443,7 +458,7 @@ class TestMCPTypes:
         assert from_dict.capabilities.roots == {"listChanged": True}
         assert from_dict.client_info.name == "Test Client"
 
-    def test_initialize_result(self):
+    def test_initialize_result(self) -> None:
         """Test InitializeResult model."""
         result = InitializeResult(
             protocol_version=PROTOCOL_VERSION,
@@ -479,54 +494,54 @@ class TestMCPTypes:
         assert from_dict.server_info.name == "Test Server"
         assert from_dict.instructions is None
 
-    def test_sampling_message(self):
+    def test_sampling_message(self) -> None:
         """Test SamplingMessage model."""
         message = SamplingMessage(
             role=Role.USER,
-            content=TextContent(type="text", text="Sample text"),
+            content=TextContent(type="text", text="Sample text"), # type: ignore
         )
         assert message.role == Role.USER
-        assert message.content.type == "text"
-        assert message.content.text == "Sample text"
+        assert message.content.type == "text" # type: ignore
+        assert message.content.text == "Sample text" # type: ignore
 
-    def test_create_message_result(self):
+    def test_create_message_result(self) -> None:
         """Test CreateMessageResult model."""
         result = CreateMessageResult(
-            content=TextContent(type="text", text="Generated response"),
+            content=TextContent(type="text", text="Generated response"), # type: ignore
             model="claude-3",
             role=Role.ASSISTANT,
             stop_reason="maxTokens",
         )
-        assert result.content.type == "text"
-        assert result.content.text == "Generated response"
+        assert result.content.type == "text" # type: ignore
+        assert result.content.text == "Generated response" # type: ignore
         assert result.model == "claude-3"
         assert result.role == Role.ASSISTANT
         assert result.stop_reason == "maxTokens"
 
         # Test minimal fields
         minimal = CreateMessageResult(
-            content=TextContent(type="text", text="Response"),
+            content=TextContent(type="text", text="Response"), # type: ignore
             model="gpt-4",
             role=Role.ASSISTANT,
         )
-        assert minimal.content.text == "Response"
+        assert minimal.content.text == "Response" # type: ignore
         assert minimal.model == "gpt-4"
         assert minimal.role == Role.ASSISTANT
         assert minimal.stop_reason is None
 
-    def test_prompt_reference(self):
+    def test_prompt_reference(self) -> None:
         """Test PromptReference model."""
-        ref = PromptReference(type="ref/prompt", name="example-prompt")
+        ref = PromptReference(type="ref/prompt", name="example-prompt") # type: ignore
         assert ref.type == "ref/prompt"
         assert ref.name == "example-prompt"
 
-    def test_resource_reference(self):
+    def test_resource_reference(self) -> None:
         """Test ResourceReference model."""
-        ref = ResourceReference(type="ref/resource", uri="file:///example.txt")
+        ref = ResourceReference(type="ref/resource", uri="file:///example.txt") # type: ignore
         assert ref.type == "ref/resource"
         assert ref.uri == "file:///example.txt"
 
-    def test_tool(self):
+    def test_tool(self) -> None:
         """Test Tool model."""
         tool = Tool(
             name="example-tool",

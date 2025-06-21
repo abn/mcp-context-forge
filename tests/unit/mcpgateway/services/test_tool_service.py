@@ -25,7 +25,7 @@ from mcpgateway.services.tool_service import (
 
 
 @pytest.fixture
-def tool_service():
+def tool_service() -> ToolService:
     """Create a tool service instance."""
     service = ToolService()
     service._http_client = AsyncMock()
@@ -33,7 +33,7 @@ def tool_service():
 
 
 @pytest.fixture
-def mock_tool():
+def mock_tool() -> MagicMock:
     """Create a mock tool model."""
     tool = MagicMock(spec=DbTool)
     tool.id = 1
@@ -82,7 +82,9 @@ class TestToolService:
     """Tests for the ToolService class."""
 
     @pytest.mark.asyncio
-    async def test_register_tool(self, tool_service, mock_tool, test_db):
+    async def test_register_tool(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test successful tool registration."""
         # Set up DB behavior
         mock_scalar = Mock()
@@ -93,8 +95,8 @@ class TestToolService:
         test_db.refresh = Mock()
 
         # Set up tool service methods
-        tool_service._notify_tool_added = AsyncMock()
-        tool_service._convert_tool_to_read = Mock(
+        tool_service._notify_tool_added = AsyncMock() # type: ignore[method-assign]
+        tool_service._convert_tool_to_read = Mock( # type: ignore[method-assign]
             return_value=ToolRead(
                 id=1,
                 name="test_tool",
@@ -152,7 +154,9 @@ class TestToolService:
         tool_service._notify_tool_added.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_register_tool_name_conflict(self, tool_service, mock_tool, test_db):
+    async def test_register_tool_name_conflict(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test tool registration with name conflict."""
         # Mock DB to return existing tool
         mock_scalar = Mock()
@@ -178,7 +182,9 @@ class TestToolService:
         assert exc_info.value.tool_id == mock_tool.id
 
     @pytest.mark.asyncio
-    async def test_register_tool_db_integrity_error(self, tool_service, test_db):
+    async def test_register_tool_db_integrity_error(
+        self, tool_service: ToolService, test_db: MagicMock
+    ) -> None:
         """Test tool registration with database IntegrityError."""
         # Mock DB to raise IntegrityError on commit
         mock_scalar = Mock()
@@ -205,7 +211,9 @@ class TestToolService:
         test_db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_tools(self, tool_service, mock_tool, test_db):
+    async def test_list_tools(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test listing tools."""
         # Mock DB to return a list of tools
         mock_scalar_result = MagicMock()
@@ -240,7 +248,7 @@ class TestToolService:
                 "last_execution_time": None,
             },
         )
-        tool_service._convert_tool_to_read = Mock(return_value=tool_read)
+        tool_service._convert_tool_to_read = Mock(return_value=tool_read) # type: ignore[method-assign]
 
         # Call method
         result = await tool_service.list_tools(test_db)
@@ -254,7 +262,9 @@ class TestToolService:
         tool_service._convert_tool_to_read.assert_called_once_with(mock_tool)
 
     @pytest.mark.asyncio
-    async def test_get_tool(self, tool_service, mock_tool, test_db):
+    async def test_get_tool(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting a tool by ID."""
         # Mock DB get to return tool
         test_db.get = Mock(return_value=mock_tool)
@@ -286,7 +296,7 @@ class TestToolService:
                 "last_execution_time": None,
             },
         )
-        tool_service._convert_tool_to_read = Mock(return_value=tool_read)
+        tool_service._convert_tool_to_read = Mock(return_value=tool_read) # type: ignore[method-assign]
 
         # Call method
         result = await tool_service.get_tool(test_db, 1)
@@ -299,7 +309,7 @@ class TestToolService:
         tool_service._convert_tool_to_read.assert_called_once_with(mock_tool)
 
     @pytest.mark.asyncio
-    async def test_get_tool_not_found(self, tool_service, test_db):
+    async def test_get_tool_not_found(self, tool_service: ToolService, test_db: MagicMock) -> None:
         """Test getting a non-existent tool."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -311,7 +321,9 @@ class TestToolService:
         assert "Tool not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_delete_tool(self, tool_service, mock_tool, test_db):
+    async def test_delete_tool(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test deleting a tool."""
         # Mock DB get to return tool
         test_db.get = Mock(return_value=mock_tool)
@@ -319,7 +331,7 @@ class TestToolService:
         test_db.commit = Mock()
 
         # Mock notification
-        tool_service._notify_tool_deleted = AsyncMock()
+        tool_service._notify_tool_deleted = AsyncMock() # type: ignore[method-assign]
 
         # Call method
         await tool_service.delete_tool(test_db, 1)
@@ -333,7 +345,7 @@ class TestToolService:
         tool_service._notify_tool_deleted.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_tool_not_found(self, tool_service, test_db):
+    async def test_delete_tool_not_found(self, tool_service: ToolService, test_db: MagicMock) -> None:
         """Test deleting a non-existent tool."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -345,7 +357,9 @@ class TestToolService:
         assert "Tool not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_toggle_tool_status(self, tool_service, mock_tool, test_db):
+    async def test_toggle_tool_status(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test toggling tool active status."""
         # Mock DB get to return tool
         test_db.get = Mock(return_value=mock_tool)
@@ -353,8 +367,8 @@ class TestToolService:
         test_db.refresh = Mock()
 
         # Mock notification methods
-        tool_service._notify_tool_activated = AsyncMock()
-        tool_service._notify_tool_deactivated = AsyncMock()
+        tool_service._notify_tool_activated = AsyncMock() # type: ignore[method-assign]
+        tool_service._notify_tool_deactivated = AsyncMock() # type: ignore[method-assign]
 
         # Mock conversion
         tool_read = ToolRead(
@@ -383,7 +397,7 @@ class TestToolService:
                 "last_execution_time": None,
             },
         )
-        tool_service._convert_tool_to_read = Mock(return_value=tool_read)
+        tool_service._convert_tool_to_read = Mock(return_value=tool_read) # type: ignore[method-assign]
 
         # Deactivate the tool (it's active by default)
         result = await tool_service.toggle_tool_status(test_db, 1, activate=False)
@@ -404,7 +418,9 @@ class TestToolService:
         assert result == tool_read
 
     @pytest.mark.asyncio
-    async def test_update_tool(self, tool_service, mock_tool, test_db):
+    async def test_update_tool(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a tool."""
         # Mock DB get to return tool
         test_db.get = Mock(return_value=mock_tool)
@@ -418,7 +434,7 @@ class TestToolService:
         test_db.refresh = Mock()
 
         # Mock notification
-        tool_service._notify_tool_updated = AsyncMock()
+        tool_service._notify_tool_updated = AsyncMock() # type: ignore[method-assign]
 
         # Mock conversion
         tool_read = ToolRead(
@@ -447,7 +463,7 @@ class TestToolService:
                 "last_execution_time": None,
             },
         )
-        tool_service._convert_tool_to_read = Mock(return_value=tool_read)
+        tool_service._convert_tool_to_read = Mock(return_value=tool_read) # type: ignore[method-assign]
 
         # Create update request
         tool_update = ToolUpdate(
@@ -476,7 +492,9 @@ class TestToolService:
         assert result == tool_read
 
     @pytest.mark.asyncio
-    async def test_update_tool_name_conflict(self, tool_service, mock_tool, test_db):
+    async def test_update_tool_name_conflict(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a tool with a name that conflicts with another tool."""
         # Mock DB get to return our tool
         test_db.get = Mock(return_value=mock_tool)
@@ -509,7 +527,7 @@ class TestToolService:
         assert exc_info.value.tool_id == conflicting_tool.id
 
     @pytest.mark.asyncio
-    async def test_update_tool_not_found(self, tool_service, test_db):
+    async def test_update_tool_not_found(self, tool_service: ToolService, test_db: MagicMock) -> None:
         """Test updating a non-existent tool."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -526,7 +544,7 @@ class TestToolService:
         assert "Tool not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_invoke_tool_not_found(self, tool_service, test_db):
+    async def test_invoke_tool_not_found(self, tool_service: ToolService, test_db: MagicMock) -> None:
         """Test invoking a non-existent tool."""
         # Mock DB to return no tool
         mock_scalar = Mock()
@@ -540,7 +558,9 @@ class TestToolService:
         assert "Tool not found: nonexistent_tool" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_invoke_tool_inactive(self, tool_service, mock_tool, test_db):
+    async def test_invoke_tool_inactive(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test invoking an inactive tool."""
         # Set tool to inactive
         mock_tool.is_active = False
@@ -561,7 +581,9 @@ class TestToolService:
         assert "Tool 'test_tool' exists but is inactive" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_invoke_tool_rest(self, tool_service, mock_tool, test_db):
+    async def test_invoke_tool_rest(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test invoking a REST tool."""
         # Configure tool as REST
         mock_tool.integration_type = "REST"
@@ -577,10 +599,12 @@ class TestToolService:
         mock_response = AsyncMock()
         mock_response.raise_for_status = AsyncMock()
         mock_response.json.return_value = {"result": {"content": [{"type": "text", "text": "REST tool response"}]}}
-        tool_service._http_client.request.return_value = mock_response
+        # tool_service._http_client is already an AsyncMock from the fixture
+        tool_service._http_client.request = AsyncMock(return_value=mock_response) # type: ignore[method-assign]
+
 
         # Mock metrics recording
-        tool_service._record_tool_metric = AsyncMock()
+        tool_service._record_tool_metric = AsyncMock() # type: ignore[method-assign]
 
         # Invoke tool
         result = await tool_service.invoke_tool(test_db, "test_tool", {"param": "value"})
@@ -611,7 +635,9 @@ class TestToolService:
         )
 
     @pytest.mark.asyncio
-    async def test_invoke_tool_error(self, tool_service, mock_tool, test_db):
+    async def test_invoke_tool_error(
+        self, tool_service: ToolService, mock_tool: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test invoking a tool that returns an error."""
         # Configure tool
         mock_tool.integration_type = "REST"
@@ -623,10 +649,11 @@ class TestToolService:
         test_db.execute = Mock(return_value=mock_scalar)
 
         # Mock HTTP client to raise an error
-        tool_service._http_client.request.side_effect = Exception("HTTP error")
+        tool_service._http_client.request = AsyncMock(side_effect=Exception("HTTP error")) # type: ignore[method-assign]
+
 
         # Mock metrics recording
-        tool_service._record_tool_metric = AsyncMock()
+        tool_service._record_tool_metric = AsyncMock() # type: ignore[method-assign]
 
         # Should raise ToolInvocationError
         with pytest.raises(ToolInvocationError) as exc_info:
@@ -644,7 +671,7 @@ class TestToolService:
         )
 
     @pytest.mark.asyncio
-    async def test_reset_metrics(self, tool_service, test_db):
+    async def test_reset_metrics(self, tool_service: ToolService, test_db: MagicMock) -> None:
         """Test resetting metrics."""
         # Mock DB operations
         test_db.execute = Mock()

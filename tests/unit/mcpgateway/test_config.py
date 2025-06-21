@@ -10,9 +10,10 @@ Authors: Mihai Criveti
 from unittest.mock import patch
 
 from mcpgateway.config import Settings, get_settings
+from unittest.mock import MagicMock
 
 
-def test_settings_default_values():
+def test_settings_default_values() -> None:
     """Test that Settings has expected default values."""
     settings = Settings()
     assert settings.app_name == "MCP Gateway"
@@ -24,13 +25,13 @@ def test_settings_default_values():
     assert settings.auth_required is True
 
 
-def test_api_key_property():
+def test_api_key_property() -> None:
     """Test the api_key property."""
     settings = Settings(basic_auth_user="test_user", basic_auth_password="test_pass")
     assert settings.api_key == "test_user:test_pass"
 
 
-def test_supports_transport_properties():
+def test_supports_transport_properties() -> None:
     """Test the transport support properties."""
     # Test 'all' transport type
     settings = Settings(transport_type="all")
@@ -52,7 +53,7 @@ def test_supports_transport_properties():
 
 
 @patch("mcpgateway.config.Settings")
-def test_get_settings_caching(mock_settings):
+def test_get_settings_caching(mock_settings: MagicMock) -> None:
     """Test that get_settings caches the result."""
     mock_settings.return_value = "test_settings"
 

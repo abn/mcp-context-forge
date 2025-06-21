@@ -11,6 +11,7 @@ Tests for the MCP Gateway SSE transport implementation.
 import asyncio
 import json
 from unittest.mock import Mock
+from typing import Dict, Any
 
 import pytest
 from fastapi import Request
@@ -20,13 +21,13 @@ from mcpgateway.transports.sse_transport import SSETransport
 
 
 @pytest.fixture
-def sse_transport():
+def sse_transport() -> SSETransport:
     """Create an SSE transport instance."""
     return SSETransport(base_url="http://test.example")
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> Mock:
     """Create a mock FastAPI request."""
     mock = Mock(spec=Request)
     return mock
@@ -36,7 +37,7 @@ class TestSSETransport:
     """Tests for the SSETransport class."""
 
     @pytest.mark.asyncio
-    async def test_connect_disconnect(self, sse_transport):
+    async def test_connect_disconnect(self, sse_transport: SSETransport) -> None:
         """Test connecting and disconnecting from SSE transport."""
         # Initially should not be connected
         assert await sse_transport.is_connected() is False
@@ -53,13 +54,13 @@ class TestSSETransport:
         assert sse_transport._client_gone.is_set()
 
     @pytest.mark.asyncio
-    async def test_send_message(self, sse_transport):
+    async def test_send_message(self, sse_transport: SSETransport) -> None:
         """Test sending a message over SSE."""
         # Connect first
         await sse_transport.connect()
 
         # Test message
-        message = {"jsonrpc": "2.0", "method": "test", "id": 1}
+        message: Dict[str, Any] = {"jsonrpc": "2.0", "method": "test", "id": 1}
 
         # Send message
         await sse_transport.send_message(message)
@@ -70,17 +71,17 @@ class TestSSETransport:
         assert queued_message == message
 
     @pytest.mark.asyncio
-    async def test_send_message_not_connected(self, sse_transport):
+    async def test_send_message_not_connected(self, sse_transport: SSETransport) -> None:
         """Test sending message when not connected raises error."""
         # Don't connect
-        message = {"jsonrpc": "2.0", "method": "test", "id": 1}
+        message: Dict[str, Any] = {"jsonrpc": "2.0", "method": "test", "id": 1}
 
         # Should raise error
         with pytest.raises(RuntimeError, match="Transport not connected"):
             await sse_transport.send_message(message)
 
     @pytest.mark.asyncio
-    async def test_create_sse_response(self, sse_transport, mock_request):
+    async def test_create_sse_response(self, sse_transport: SSETransport, mock_request: Mock) -> None:
         """Test creating SSE response."""
         # Connect first
         await sse_transport.connect()
@@ -98,7 +99,7 @@ class TestSSETransport:
         assert response.headers["X-MCP-SSE"] == "true"
 
     @pytest.mark.asyncio
-    async def test_receive_message(self, sse_transport):
+    async def test_receive_message(self, sse_transport: SSETransport) -> None:
         """Test receiving messages from client."""
         # Connect first
         await sse_transport.connect()
@@ -117,13 +118,13 @@ class TestSSETransport:
         # Wait for the generator to end
         with pytest.raises(StopAsyncIteration):
             # Use a timeout in case the generator doesn't end
-            async def wait_with_timeout():
+            async def wait_with_timeout() -> None:
                 await asyncio.wait_for(receive_gen.__anext__(), timeout=1.0)
 
             await wait_with_timeout()
 
     @pytest.mark.asyncio
-    async def test_event_generator(self, sse_transport, mock_request):
+    async def test_event_generator(self, sse_transport: SSETransport, mock_request: Mock) -> None:
         """Test the event generator for SSE."""
         # Connect first
         await sse_transport.connect()
@@ -145,7 +146,7 @@ class TestSSETransport:
         assert event["event"] == "keepalive"
 
         # Queue a test message
-        test_message = {"jsonrpc": "2.0", "result": "test", "id": 1}
+        test_message: Dict[str, Any] = {"jsonrpc": "2.0", "result": "test", "id": 1}
         await sse_transport._message_queue.put(test_message)
 
         # Next event should be the message

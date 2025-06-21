@@ -26,13 +26,13 @@ from mcpgateway.services.server_service import (
 
 
 @pytest.fixture
-def server_service():
+def server_service() -> ServerService:
     """Create a server service instance."""
     return ServerService()
 
 
 @pytest.fixture
-def mock_server():
+def mock_server() -> MagicMock:
     """Create a mock server model."""
     server = MagicMock(spec=DbServer)
     server.id = 1
@@ -72,7 +72,7 @@ def mock_server():
 
 
 @pytest.fixture
-def mock_tool():
+def mock_tool() -> MagicMock:
     """Create a mock tool."""
     tool = MagicMock(spec=DbTool)
     tool.id = 101
@@ -81,7 +81,7 @@ def mock_tool():
 
 
 @pytest.fixture
-def mock_resource():
+def mock_resource() -> MagicMock:
     """Create a mock resource."""
     resource = MagicMock(spec=DbResource)
     resource.id = 201
@@ -90,7 +90,7 @@ def mock_resource():
 
 
 @pytest.fixture
-def mock_prompt():
+def mock_prompt() -> MagicMock:
     """Create a mock prompt."""
     prompt = MagicMock(spec=DbPrompt)
     prompt.id = 301
@@ -102,7 +102,14 @@ class TestServerService:
     """Tests for the ServerService class."""
 
     @pytest.mark.asyncio
-    async def test_register_server(self, server_service, test_db, mock_tool, mock_resource, mock_prompt):
+    async def test_register_server(
+        self,
+        server_service: ServerService,
+        test_db: MagicMock,
+        mock_tool: MagicMock,
+        mock_resource: MagicMock,
+        mock_prompt: MagicMock,
+    ) -> None:
         """Test successful server registration."""
         # Set up DB behavior
         mock_scalar = Mock()
@@ -122,8 +129,8 @@ class TestServerService:
         )
 
         # Set up service methods
-        server_service._notify_server_added = AsyncMock()
-        server_service._convert_server_to_read = Mock(
+        server_service._notify_server_added = AsyncMock() # type: ignore[method-assign]
+        server_service._convert_server_to_read = Mock( # type: ignore[method-assign]
             return_value=ServerRead(
                 id=1,
                 name="test_server",
@@ -172,7 +179,9 @@ class TestServerService:
         assert 301 in result.associated_prompts
 
     @pytest.mark.asyncio
-    async def test_register_server_name_conflict(self, server_service, mock_server, test_db):
+    async def test_register_server_name_conflict(
+        self, server_service: ServerService, mock_server: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test server registration with name conflict."""
         # Mock DB to return existing server
         mock_scalar = Mock()
@@ -192,7 +201,9 @@ class TestServerService:
         assert exc_info.value.server_id == mock_server.id
 
     @pytest.mark.asyncio
-    async def test_register_server_invalid_associated_tool(self, server_service, test_db):
+    async def test_register_server_invalid_associated_tool(
+        self, server_service: ServerService, test_db: MagicMock
+    ) -> None:
         """Test server registration with non-existent associated tool."""
         # Set up DB behavior
         mock_scalar = Mock()
@@ -216,7 +227,9 @@ class TestServerService:
         test_db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_servers(self, server_service, mock_server, test_db):
+    async def test_list_servers(
+        self, server_service: ServerService, mock_server: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test listing servers."""
         # Mock DB to return a list of servers
         mock_scalar_result = MagicMock()
@@ -247,7 +260,7 @@ class TestServerService:
                 "last_execution_time": None,
             },
         )
-        server_service._convert_server_to_read = Mock(return_value=server_read)
+        server_service._convert_server_to_read = Mock(return_value=server_read) # type: ignore[method-assign]
 
         # Call method
         result = await server_service.list_servers(test_db)
@@ -261,7 +274,9 @@ class TestServerService:
         server_service._convert_server_to_read.assert_called_once_with(mock_server)
 
     @pytest.mark.asyncio
-    async def test_get_server(self, server_service, mock_server, test_db):
+    async def test_get_server(
+        self, server_service: ServerService, mock_server: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting a server by ID."""
         # Mock DB get to return server
         test_db.get = Mock(return_value=mock_server)
@@ -289,7 +304,7 @@ class TestServerService:
                 "last_execution_time": None,
             },
         )
-        server_service._convert_server_to_read = Mock(return_value=server_read)
+        server_service._convert_server_to_read = Mock(return_value=server_read) # type: ignore[method-assign]
 
         # Call method
         result = await server_service.get_server(test_db, 1)
@@ -302,7 +317,7 @@ class TestServerService:
         server_service._convert_server_to_read.assert_called_once_with(mock_server)
 
     @pytest.mark.asyncio
-    async def test_get_server_not_found(self, server_service, test_db):
+    async def test_get_server_not_found(self, server_service: ServerService, test_db: MagicMock) -> None:
         """Test getting a non-existent server."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -314,7 +329,15 @@ class TestServerService:
         assert "Server not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_update_server(self, server_service, mock_server, test_db, mock_tool, mock_resource, mock_prompt):
+    async def test_update_server(
+        self,
+        server_service: ServerService,
+        mock_server: MagicMock,
+        test_db: MagicMock,
+        mock_tool: MagicMock,
+        mock_resource: MagicMock,
+        mock_prompt: MagicMock,
+    ) -> None:
         """Test updating a server."""
         # Mock DB get to return server
         test_db.get = Mock(
@@ -338,8 +361,8 @@ class TestServerService:
         test_db.refresh = Mock()
 
         # Set up service methods
-        server_service._notify_server_updated = AsyncMock()
-        server_service._convert_server_to_read = Mock(
+        server_service._notify_server_updated = AsyncMock() # type: ignore[method-assign]
+        server_service._convert_server_to_read = Mock( # type: ignore[method-assign]
             return_value=ServerRead(
                 id=1,
                 name="updated_server",
@@ -391,7 +414,7 @@ class TestServerService:
         assert 302 in result.associated_prompts
 
     @pytest.mark.asyncio
-    async def test_update_server_not_found(self, server_service, test_db):
+    async def test_update_server_not_found(self, server_service: ServerService, test_db: MagicMock) -> None:
         """Test updating a non-existent server."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -406,7 +429,9 @@ class TestServerService:
         assert "Server not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_update_server_name_conflict(self, server_service, mock_server, test_db):
+    async def test_update_server_name_conflict(
+        self, server_service: ServerService, mock_server: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a server with a name that conflicts with another server."""
         # Create a second server (the one being updated)
         server1 = mock_server
@@ -442,7 +467,9 @@ class TestServerService:
         assert exc_info.value.server_id == server2.id
 
     @pytest.mark.asyncio
-    async def test_toggle_server_status(self, server_service, mock_server, test_db):
+    async def test_toggle_server_status(
+        self, server_service: ServerService, mock_server: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test toggling server active status."""
         # Mock DB get to return server
         test_db.get = Mock(return_value=mock_server)
@@ -450,9 +477,9 @@ class TestServerService:
         test_db.refresh = Mock()
 
         # Set up service methods
-        server_service._notify_server_activated = AsyncMock()
-        server_service._notify_server_deactivated = AsyncMock()
-        server_service._convert_server_to_read = Mock(
+        server_service._notify_server_activated = AsyncMock() # type: ignore[method-assign]
+        server_service._notify_server_deactivated = AsyncMock() # type: ignore[method-assign]
+        server_service._convert_server_to_read = Mock( # type: ignore[method-assign]
             return_value=ServerRead(
                 id=1,
                 name="test_server",
@@ -496,7 +523,9 @@ class TestServerService:
         assert result.is_active is False
 
     @pytest.mark.asyncio
-    async def test_delete_server(self, server_service, mock_server, test_db):
+    async def test_delete_server(
+        self, server_service: ServerService, mock_server: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test deleting a server."""
         # Mock DB get to return server
         test_db.get = Mock(return_value=mock_server)
@@ -504,7 +533,7 @@ class TestServerService:
         test_db.commit = Mock()
 
         # Set up service methods
-        server_service._notify_server_deleted = AsyncMock()
+        server_service._notify_server_deleted = AsyncMock() # type: ignore[method-assign]
 
         # Call method
         await server_service.delete_server(test_db, 1)
@@ -518,7 +547,7 @@ class TestServerService:
         server_service._notify_server_deleted.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_server_not_found(self, server_service, test_db):
+    async def test_delete_server_not_found(self, server_service: ServerService, test_db: MagicMock) -> None:
         """Test deleting a non-existent server."""
         # Mock DB get to return None
         test_db.get = Mock(return_value=None)
@@ -530,7 +559,7 @@ class TestServerService:
         assert "Server not found: 999" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_reset_metrics(self, server_service, test_db):
+    async def test_reset_metrics(self, server_service: ServerService, test_db: MagicMock) -> None:
         """Test resetting metrics."""
         # Mock DB operations
         test_db.execute = Mock()

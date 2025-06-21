@@ -39,6 +39,7 @@ from mcpgateway.schemas import (
     ResourceUpdate,
 )
 from mcpgateway.types import ResourceContent, ResourceTemplate, TextContent
+from mcpgateway.schemas import ResourceMetrics # Moved import to top
 
 logger = logging.getLogger(__name__)
 

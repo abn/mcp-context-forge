@@ -20,7 +20,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union # Added Union
 
 import httpx
 from mcp import ClientSession
@@ -38,8 +38,9 @@ from mcpgateway.schemas import (
     ToolCreate,
     ToolRead,
     ToolUpdate,
+    ToolMetrics, # Added import here
 )
-from mcpgateway.types import TextContent, ToolResult
+from mcpgateway.types import TextContent, ToolResult, ImageContent # Added ImageContent for invoke_tool
 from mcpgateway.utils.services_auth import decode_auth
 
 from ..config import extract_using_jq
@@ -126,26 +127,46 @@ class ToolService:
         tool_dict["request_type"] = tool.request_type
 
         decoded_auth_value = decode_auth(tool.auth_value)
-        if tool.auth_type == "basic":
-            decoded_bytes = base64.b64decode(decoded_auth_value["Authorization"].split("Basic ")[1])
-            username, password = decoded_bytes.decode("utf-8").split(":")
-            tool_dict["auth"] = {
-                "auth_type": "basic",
-                "username": username,
-                "password": "********" if password else None,
-            }
-        elif tool.auth_type == "bearer":
-            tool_dict["auth"] = {
-                "auth_type": "bearer",
-                "token": "********" if decoded_auth_value["Authorization"] else None,
-            }
-        elif tool.auth_type == "authheaders":
-            tool_dict["auth"] = {
-                "auth_type": "authheaders",
-                "auth_header_key": next(iter(decoded_auth_value)),
-                "auth_header_value": "********" if decoded_auth_value[next(iter(decoded_auth_value))] else None,
-            }
-        else:
+        if decoded_auth_value: # Check if not None
+            if tool.auth_type == "basic":
+                auth_header = decoded_auth_value.get("Authorization", "")
+                if isinstance(auth_header, str) and auth_header.startswith("Basic "):
+                    try:
+                        decoded_bytes = base64.b64decode(auth_header.split("Basic ")[1])
+                        username, password = decoded_bytes.decode("utf-8").split(":", 1)
+                        tool_dict["auth"] = {
+                            "auth_type": "basic",
+                            "username": username,
+                            "password": "********" if password else "", # Ensure password is not None
+                        }
+                    except Exception:
+                        logger.warning(f"Failed to decode basic auth for tool {tool.id}")
+                        tool_dict["auth"] = {"auth_type": "basic", "username": "", "password": ""}
+                else:
+                    tool_dict["auth"] = {"auth_type": "basic", "username": "", "password": ""}
+
+            elif tool.auth_type == "bearer":
+                auth_header = decoded_auth_value.get("Authorization", "")
+                token_present = isinstance(auth_header, str) and auth_header.startswith("Bearer ") and len(auth_header.split("Bearer ")[1]) > 0
+                tool_dict["auth"] = {
+                    "auth_type": "bearer",
+                    "token": "********" if token_present else "",
+                }
+            elif tool.auth_type == "authheaders":
+                # Assuming decoded_auth_value is a dict with one key-value pair
+                if len(decoded_auth_value) == 1:
+                    key = next(iter(decoded_auth_value))
+                    value = decoded_auth_value[key]
+                    tool_dict["auth"] = {
+                        "auth_type": "authheaders",
+                        "auth_header_key": key,
+                        "auth_header_value": "********" if value else "",
+                    }
+                else: # Malformed or empty
+                    tool_dict["auth"] = {"auth_type": "authheaders", "auth_header_key": "", "auth_header_value": ""}
+            else:
+                tool_dict["auth"] = None
+        else: # decoded_auth_value is None
             tool_dict["auth"] = None
         return ToolRead.model_validate(tool_dict)
 
@@ -488,10 +509,11 @@ class ToolService:
         try:
             # tool.validate_arguments(arguments)
             # Build headers with auth if necessary.
-            headers = tool.headers or {}
+            headers = tool.headers.copy() if tool.headers else {} # Ensure we have a mutable dict
             if tool.integration_type == "REST":
                 credentials = decode_auth(tool.auth_value)
-                headers.update(credentials)
+                if credentials:
+                    headers.update(credentials)
 
                 # Build the payload based on integration type.
                 payload = arguments.copy()
@@ -538,12 +560,19 @@ class ToolService:
             elif tool.integration_type == "MCP":
                 transport = tool.request_type.lower()
                 gateway = db.execute(select(DbGateway).where(DbGateway.id == tool.gateway_id).where(DbGateway.is_active)).scalar_one_or_none()
-                if gateway.auth_type == "bearer":
-                    headers = decode_auth(gateway.auth_value)
-                else:
-                    headers = {}
+                if not gateway:
+                    raise ToolInvocationError(f"Federation gateway for tool '{tool.name}' (ID: {tool.gateway_id}) not found or inactive.")
 
-                async def connect_to_sse_server(server_url: str) -> str:
+                current_headers: Dict[str, str] = {}
+                if gateway.auth_type == "bearer": # This is gateway's auth to talk to another gateway
+                    auth_headers_for_gw = decode_auth(gateway.auth_value)
+                    if auth_headers_for_gw:
+                        # decode_auth returns Dict[Any, Any], ensure compatibility
+                        for k, v in auth_headers_for_gw.items():
+                            current_headers[str(k)] = str(v)
+                # else: tool.headers could be merged here if needed, but typically gateway auth is primary.
+
+                async def connect_to_sse_server(server_url: str) -> Any: # Changed to Any for now
                     """
                     Connect to an MCP server running with SSE transport
 
@@ -551,17 +580,17 @@ class ToolService:
                         server_url (str): MCP Server SSE URL
 
                     Returns:
-                        str: Result of tool call
+                        Any: Result of tool call (actually mcp.types.MCPToolResult)
                     """
                     # Use async with directly to manage the context
-                    async with sse_client(url=server_url, headers=headers) as streams:
+                    async with sse_client(url=server_url, headers=current_headers) as streams:
                         async with ClientSession(*streams) as session:
                             # Initialize the session
                             await session.initialize()
                             tool_call_result = await session.call_tool(name, arguments)
                     return tool_call_result
 
-                async def connect_to_streamablehttp_server(server_url: str) -> str:
+                async def connect_to_streamablehttp_server(server_url: str) -> Any: # Changed to Any for now
                     """
                     Connect to an MCP server running with Streamable HTTP transport
 
@@ -586,13 +615,56 @@ class ToolService:
                     tool_call_result = await connect_to_sse_server(tool_gateway.url)
                 elif transport == "streamablehttp":
                     tool_call_result = await connect_to_streamablehttp_server(tool_gateway.url)
-                content = tool_call_result.model_dump(by_alias=True).get("content", [])
+                else:
+                    raise ToolInvocationError(f"Unsupported MCP transport type: {transport}")
 
+                # Assuming tool_call_result is an object with a .content attribute (e.g., from mcp.types.MCPToolResult)
+                # and that .content is List[MCPContentPart]
+                mcp_content_parts: List[Any] = tool_call_result.content
+
+                # Placeholder for converting mcp.types.MCPContentPart to mcpgateway.types.TextContent/ImageContent
+                # This conversion logic needs to be robust.
+                processed_content_for_tool_result: List[Union[TextContent, ImageContent]] = []
+                if isinstance(mcp_content_parts, list):
+                    for part in mcp_content_parts:
+                        # Basic conversion, assuming part has 'type' and 'text' or 'data'/'mime_type'
+                        part_type = getattr(part, 'type', None)
+                        if part_type == 'text' and hasattr(part, 'text'):
+                            processed_content_for_tool_result.append(TextContent(type="text", text=str(getattr(part, 'text'))))
+                        elif part_type == 'image' and hasattr(part, 'data') and hasattr(part, 'mime_type'):
+                            processed_content_for_tool_result.append(ImageContent(type="image", data=bytes(getattr(part, 'data')), mime_type=str(getattr(part, 'mime_type'))))
+                        else:
+                            # Fallback for unknown parts or if direct conversion isn't simple
+                            try:
+                                processed_content_for_tool_result.append(TextContent(type="text", text=json.dumps(part)))
+                            except TypeError:
+                                processed_content_for_tool_result.append(TextContent(type="text", text=str(part)))
+
+
+                # Apply JQ filter if specified. This part is complex as extract_using_jq might expect dicts.
+                # This is a MAJOR simplification and likely needs more robust handling.
+                if tool.jsonpath_filter:
+                    # This assumes extract_using_jq works on the list of processed Pydantic models,
+                    # or that those models can be easily converted to dicts for it.
+                    # For now, let's assume it works on a list of dicts.
+                    try:
+                        dict_parts = [json.loads(p.model_dump_json()) for p in processed_content_for_tool_result]
+                        filtered_data = extract_using_jq(dict_parts, tool.jsonpath_filter)
+                        # Reconstruct TextContent from filtered_data. This is very basic.
+                        if isinstance(filtered_data, list):
+                             final_content = [TextContent(type="text", text=json.dumps(item)) for item in filtered_data]
+                        else:
+                             final_content = [TextContent(type="text", text=json.dumps(filtered_data))]
+                        tool_result = ToolResult(content=final_content)
+                    except Exception as e:
+                        logger.error(f"Error during JQ filtering or content reconstruction: {e}")
+                        tool_result = ToolResult(content=[TextContent(type="text", text=f"Error processing tool output: {e}")], is_error=True)
+                else:
+                    tool_result = ToolResult(content=processed_content_for_tool_result)
                 success = True
-                filtered_response = extract_using_jq(content, tool.jsonpath_filter)
-                tool_result = ToolResult(content=filtered_response)
             else:
-                return ToolResult(content="Invalid tool type")
+                # This case should ideally not be reached if integration_type is validated upon tool creation/update
+                tool_result = ToolResult(content=[TextContent(type="text", text="Invalid tool integration type configured")], is_error=True)
 
             return tool_result
         except Exception as e:
@@ -832,7 +904,7 @@ class ToolService:
             self._event_subscribers.remove(queue)
 
     # --- Metrics ---
-    async def aggregate_metrics(self, db: Session) -> Dict[str, Any]:
+    async def aggregate_metrics(self, db: Session) -> ToolMetrics:
         """
         Aggregate metrics for all tool invocations.
 
@@ -860,16 +932,16 @@ class ToolService:
         avg_rt = db.execute(select(func.avg(ToolMetric.response_time))).scalar()
         last_time = db.execute(select(func.max(ToolMetric.timestamp))).scalar()
 
-        return {
-            "total_executions": total,
-            "successful_executions": successful,
-            "failed_executions": failed,
-            "failure_rate": failure_rate,
-            "min_response_time": min_rt,
-            "max_response_time": max_rt,
-            "avg_response_time": avg_rt,
-            "last_execution_time": last_time,
-        }
+        return ToolMetrics(
+            total_executions=total,
+            successful_executions=successful,
+            failed_executions=failed,
+            failure_rate=failure_rate,
+            min_response_time=min_rt,
+            max_response_time=max_rt,
+            avg_response_time=avg_rt,
+            last_execution_time=last_time,
+        )
 
     async def reset_metrics(self, db: Session, tool_id: Optional[int] = None) -> None:
         """

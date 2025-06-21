@@ -10,6 +10,7 @@ Tests for the MCP Gateway WebSocket transport implementation.
 
 import asyncio
 from unittest.mock import AsyncMock, patch
+from typing import Dict, Any
 
 import pytest
 from fastapi import WebSocket, WebSocketDisconnect
@@ -18,7 +19,7 @@ from mcpgateway.transports.websocket_transport import WebSocketTransport
 
 
 @pytest.fixture
-def mock_websocket():
+def mock_websocket() -> AsyncMock:
     """Create a mock WebSocket."""
     mock = AsyncMock(spec=WebSocket)
     mock.accept = AsyncMock()
@@ -31,7 +32,7 @@ def mock_websocket():
 
 
 @pytest.fixture
-def websocket_transport(mock_websocket):
+def websocket_transport(mock_websocket: AsyncMock) -> WebSocketTransport:
     """Create a WebSocket transport with a mock WebSocket."""
     return WebSocketTransport(websocket=mock_websocket)
 
@@ -40,7 +41,7 @@ class TestWebSocketTransport:
     """Tests for the WebSocketTransport class."""
 
     @pytest.mark.asyncio
-    async def test_connect(self, websocket_transport, mock_websocket):
+    async def test_connect(self, websocket_transport: WebSocketTransport, mock_websocket: AsyncMock) -> None:
         """Test connecting to WebSocket transport."""
         # Initially should not be connected
         assert await websocket_transport.is_connected() is False
@@ -53,7 +54,7 @@ class TestWebSocketTransport:
         assert await websocket_transport.is_connected() is True
 
     @pytest.mark.asyncio
-    async def test_disconnect(self, websocket_transport, mock_websocket):
+    async def test_disconnect(self, websocket_transport: WebSocketTransport, mock_websocket: AsyncMock) -> None:
         """Test disconnecting from WebSocket transport."""
         # Connect first
         await websocket_transport.connect()
@@ -67,36 +68,36 @@ class TestWebSocketTransport:
         assert await websocket_transport.is_connected() is False
 
     @pytest.mark.asyncio
-    async def test_send_message(self, websocket_transport, mock_websocket):
+    async def test_send_message(self, websocket_transport: WebSocketTransport, mock_websocket: AsyncMock) -> None:
         """Test sending a message over WebSocket."""
         # Connect first
         await websocket_transport.connect()
 
         # Send message
-        test_message = {"jsonrpc": "2.0", "method": "test", "id": 1}
+        test_message: Dict[str, Any] = {"jsonrpc": "2.0", "method": "test", "id": 1}
         await websocket_transport.send_message(test_message)
 
         # Should have sent the message
         mock_websocket.send_json.assert_called_once_with(test_message)
 
     @pytest.mark.asyncio
-    async def test_send_message_not_connected(self, websocket_transport):
+    async def test_send_message_not_connected(self, websocket_transport: WebSocketTransport) -> None:
         """Test sending message when not connected raises error."""
         # Don't connect
-        test_message = {"jsonrpc": "2.0", "method": "test", "id": 1}
+        test_message: Dict[str, Any] = {"jsonrpc": "2.0", "method": "test", "id": 1}
 
         # Should raise error
         with pytest.raises(RuntimeError, match="Transport not connected"):
             await websocket_transport.send_message(test_message)
 
     @pytest.mark.asyncio
-    async def test_receive_message(self, websocket_transport, mock_websocket):
+    async def test_receive_message(self, websocket_transport: WebSocketTransport, mock_websocket: AsyncMock) -> None:
         """Test receiving messages from WebSocket."""
         # Connect first
         await websocket_transport.connect()
 
         # Set up return values
-        test_messages = [
+        test_messages: list[Any] = [
             {"jsonrpc": "2.0", "method": "test1", "id": 1},
             {"jsonrpc": "2.0", "method": "test2", "id": 2},
             WebSocketDisconnect(),  # Raise this after the second message
@@ -127,7 +128,7 @@ class TestWebSocketTransport:
         assert await websocket_transport.is_connected() is False
 
     @pytest.mark.asyncio
-    async def test_send_ping(self, websocket_transport, mock_websocket):
+    async def test_send_ping(self, websocket_transport: WebSocketTransport, mock_websocket: AsyncMock) -> None:
         """Test sending a ping message."""
         # Connect first
         await websocket_transport.connect()
@@ -139,7 +140,7 @@ class TestWebSocketTransport:
         mock_websocket.send_bytes.assert_called_once_with(b"ping")
 
     @pytest.mark.asyncio
-    async def test_ping_loop(self, websocket_transport, mock_websocket):
+    async def test_ping_loop(self, websocket_transport: WebSocketTransport, mock_websocket: AsyncMock) -> None:
         """Test the ping loop with valid response."""
         # Mock dependencies
         with patch("mcpgateway.config.settings") as mock_settings, patch("asyncio.sleep", new_callable=AsyncMock):
@@ -153,7 +154,7 @@ class TestWebSocketTransport:
             mock_websocket.receive_bytes.return_value = b"pong"
 
             # Start ping task
-            ping_task = asyncio.create_task(websocket_transport._ping_loop())
+            ping_task: asyncio.Task[None] = asyncio.create_task(websocket_transport._ping_loop())
 
             # Let it run a little
             await asyncio.sleep(0.2)

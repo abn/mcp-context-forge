@@ -40,8 +40,10 @@ class StdioTransport(Transport):
         self._stdin_reader = reader
 
         # Set up stdout writer
-        transport, protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout)
-        self._stdout_writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+        # For connect_write_pipe, the protocol_factory should return an instance of asyncio.Protocol.
+        # Pass a lambda that constructs an asyncio.Protocol instance.
+        transport, protocol = await loop.connect_write_pipe(lambda: asyncio.Protocol(), sys.stdout) # type: ignore[arg-type, return-value]
+        self._stdout_writer = asyncio.StreamWriter(transport, protocol, None, loop) # reader is None for a write-only stream
 
         self._connected = True
         logger.info("stdio transport connected")
@@ -75,7 +77,7 @@ class StdioTransport(Transport):
             logger.error(f"Failed to send message: {e}")
             raise
 
-    async def receive_message(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def receive_message(self) -> AsyncGenerator[Dict[str, Any], None]: # type: ignore[override]
         """Receive messages from stdin.
 
         Yields:

@@ -65,13 +65,13 @@ from mcpgateway.services.tool_service import (
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Create a mock database session."""
     return MagicMock(spec=Session)
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> MagicMock:
     """Create a mock FastAPI request."""
     request = MagicMock(spec=Request)
 
@@ -122,7 +122,7 @@ class TestAdminServerRoutes:
     """Test admin routes for server management."""
 
     @patch.object(ServerService, "list_servers")
-    async def test_admin_list_servers(self, mock_list_servers, mock_db):
+    async def test_admin_list_servers(self, mock_list_servers: AsyncMock, mock_db: MagicMock) -> None:
         """Test listing servers through admin UI."""
         # Setup
         mock_server1 = MagicMock()
@@ -141,7 +141,7 @@ class TestAdminServerRoutes:
         assert result[1] == {"id": 2, "name": "Server 2"}
 
     @patch.object(ServerService, "get_server")
-    async def test_admin_get_server(self, mock_get_server, mock_db):
+    async def test_admin_get_server(self, mock_get_server: AsyncMock, mock_db: MagicMock) -> None:
         """Test getting a single server through admin UI."""
         # Setup
         mock_server = MagicMock()
@@ -156,7 +156,7 @@ class TestAdminServerRoutes:
         assert result == {"id": 1, "name": "Server 1"}
 
     @patch.object(ServerService, "get_server")
-    async def test_admin_get_server_not_found(self, mock_get_server, mock_db):
+    async def test_admin_get_server_not_found(self, mock_get_server: AsyncMock, mock_db: MagicMock) -> None:
         """Test getting a non-existent server through admin UI."""
         # Setup
         mock_get_server.side_effect = ServerNotFoundError("Server not found")
@@ -169,7 +169,9 @@ class TestAdminServerRoutes:
         assert "Server not found" in str(excinfo.value.detail)
 
     @patch.object(ServerService, "register_server")
-    async def test_admin_add_server(self, mock_register_server, mock_request, mock_db):
+    async def test_admin_add_server(
+        self, mock_register_server: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test adding a server through admin UI."""
         # Execute
         result = await admin_add_server(mock_request, mock_db, "test-user")
@@ -181,7 +183,9 @@ class TestAdminServerRoutes:
         assert "/admin#catalog" in result.headers["location"]
 
     @patch.object(ServerService, "update_server")
-    async def test_admin_edit_server(self, mock_update_server, mock_request, mock_db):
+    async def test_admin_edit_server(
+        self, mock_update_server: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test editing a server through admin UI."""
         # Execute
         result = await admin_edit_server(1, mock_request, mock_db, "test-user")
@@ -193,7 +197,9 @@ class TestAdminServerRoutes:
         assert "/admin#catalog" in result.headers["location"]
 
     @patch.object(ServerService, "toggle_server_status")
-    async def test_admin_toggle_server(self, mock_toggle_status, mock_request, mock_db):
+    async def test_admin_toggle_server(
+        self, mock_toggle_status: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test toggling server status through admin UI."""
         # Execute
         result = await admin_toggle_server(1, mock_request, mock_db, "test-user")
@@ -205,7 +211,9 @@ class TestAdminServerRoutes:
         assert "/admin#catalog" in result.headers["location"]
 
     @patch.object(ServerService, "delete_server")
-    async def test_admin_delete_server(self, mock_delete_server, mock_request, mock_db):
+    async def test_admin_delete_server(
+        self, mock_delete_server: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test deleting a server through admin UI."""
         result = await admin_delete_server(1, mock_request, mock_db, "test-user")
 
@@ -219,7 +227,7 @@ class TestAdminToolRoutes:
     """Test admin routes for tool management."""
 
     @patch.object(ToolService, "list_tools")
-    async def test_admin_list_tools(self, mock_list_tools, mock_db):
+    async def test_admin_list_tools(self, mock_list_tools: AsyncMock, mock_db: MagicMock) -> None:
         """Test listing tools through admin UI."""
         # Setup
         mock_tool1 = MagicMock()
@@ -238,7 +246,7 @@ class TestAdminToolRoutes:
         assert result[1] == {"id": 2, "name": "Tool 2"}
 
     @patch.object(ToolService, "get_tool")
-    async def test_admin_get_tool(self, mock_get_tool, mock_db):
+    async def test_admin_get_tool(self, mock_get_tool: AsyncMock, mock_db: MagicMock) -> None:
         """Test getting a single tool through admin UI."""
         # Setup
         mock_tool = MagicMock()
@@ -253,7 +261,9 @@ class TestAdminToolRoutes:
         assert result == {"id": 1, "name": "Tool 1"}
 
     @patch.object(ToolService, "register_tool")
-    async def test_admin_add_tool(self, mock_register_tool, mock_request, mock_db):
+    async def test_admin_add_tool(
+        self, mock_register_tool: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test adding a tool through admin UI."""
         # Execute
         result = await admin_add_tool(mock_request, mock_db, "test-user")
@@ -265,7 +275,9 @@ class TestAdminToolRoutes:
         assert json.loads(result.body)["success"] is True
 
     @patch.object(ToolService, "register_tool")
-    async def test_admin_add_tool_conflict(self, mock_register_tool, mock_request, mock_db):
+    async def test_admin_add_tool_conflict(
+        self, mock_register_tool: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test adding a tool with a conflicting name."""
         # Setup
         mock_register_tool.side_effect = ToolNameConflictError("Tool name exists")
@@ -279,7 +291,9 @@ class TestAdminToolRoutes:
         assert json.loads(result.body)["success"] is False
 
     @patch.object(ToolService, "update_tool")
-    async def test_admin_edit_tool(self, mock_update_tool, mock_request, mock_db):
+    async def test_admin_edit_tool(
+        self, mock_update_tool: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test editing a tool through admin UI."""
         # Execute
         result = await admin_edit_tool(1, mock_request, mock_db, "test-user")
@@ -291,7 +305,9 @@ class TestAdminToolRoutes:
         assert "/admin#tools" in result.headers["location"]
 
     @patch.object(ToolService, "update_tool")
-    async def test_admin_edit_tool_conflict(self, mock_update_tool, mock_request, mock_db):
+    async def test_admin_edit_tool_conflict(
+        self, mock_update_tool: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test editing a tool with a conflicting name."""
         # Setup
         mock_update_tool.side_effect = ToolNameConflictError("Tool name exists")
@@ -305,7 +321,9 @@ class TestAdminToolRoutes:
         assert json.loads(result.body)["success"] is False
 
     @patch.object(ToolService, "toggle_tool_status")
-    async def test_admin_toggle_tool(self, mock_toggle_status, mock_request, mock_db):
+    async def test_admin_toggle_tool(
+        self, mock_toggle_status: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test toggling tool status through admin UI."""
         # Execute
         result = await admin_toggle_tool(1, mock_request, mock_db, "test-user")
@@ -317,7 +335,9 @@ class TestAdminToolRoutes:
         assert "/admin#tools" in result.headers["location"]
 
     @patch.object(ToolService, "delete_tool")
-    async def test_admin_delete_tool(self, mock_delete_tool, mock_request, mock_db):
+    async def test_admin_delete_tool(
+        self, mock_delete_tool: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test deleting a tool through admin UI."""
         result = await admin_delete_tool(1, mock_request, mock_db, "test-user")
 
@@ -331,7 +351,7 @@ class TestAdminResourceRoutes:
     """Test admin routes for resource management."""
 
     @patch.object(ResourceService, "list_resources")
-    async def test_admin_list_resources(self, mock_list_resources, mock_db):
+    async def test_admin_list_resources(self, mock_list_resources: AsyncMock, mock_db: MagicMock) -> None:
         """Test listing resources through admin UI."""
         # Setup
         mock_resource1 = MagicMock()
@@ -351,7 +371,9 @@ class TestAdminResourceRoutes:
 
     @patch.object(ResourceService, "get_resource_by_uri")
     @patch.object(ResourceService, "read_resource")
-    async def test_admin_get_resource(self, mock_read_resource, mock_get_resource, mock_db):
+    async def test_admin_get_resource(
+        self, mock_read_resource: AsyncMock, mock_get_resource: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test getting a single resource through admin UI."""
         # Setup
         mock_resource = MagicMock()
@@ -369,7 +391,9 @@ class TestAdminResourceRoutes:
         assert result["content"] == {"type": "resource", "text": "content"}
 
     @patch.object(ResourceService, "register_resource")
-    async def test_admin_add_resource(self, mock_register_resource, mock_request, mock_db):
+    async def test_admin_add_resource(
+        self, mock_register_resource: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test adding a resource through admin UI."""
         # Execute
         result = await admin_add_resource(mock_request, mock_db, "test-user")
@@ -381,7 +405,9 @@ class TestAdminResourceRoutes:
         assert "/admin#resources" in result.headers["location"]
 
     @patch.object(ResourceService, "update_resource")
-    async def test_admin_edit_resource(self, mock_update_resource, mock_request, mock_db):
+    async def test_admin_edit_resource(
+        self, mock_update_resource: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test editing a resource through admin UI."""
         # Execute
         result = await admin_edit_resource("/test/resource", mock_request, mock_db, "test-user")
@@ -393,7 +419,9 @@ class TestAdminResourceRoutes:
         assert "/admin#resources" in result.headers["location"]
 
     @patch.object(ResourceService, "toggle_resource_status")
-    async def test_admin_toggle_resource(self, mock_toggle_status, mock_request, mock_db):
+    async def test_admin_toggle_resource(
+        self, mock_toggle_status: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test toggling resource status through admin UI."""
         # Execute
         result = await admin_toggle_resource(1, mock_request, mock_db, "test-user")
@@ -405,7 +433,9 @@ class TestAdminResourceRoutes:
         assert "/admin#resources" in result.headers["location"]
 
     @patch.object(ResourceService, "delete_resource")
-    async def test_admin_delete_resource(self, mock_delete_resource, mock_request, mock_db):
+    async def test_admin_delete_resource(
+        self, mock_delete_resource: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test deleting a resource through admin UI."""
         result = await admin_delete_resource("/test/resource", mock_request, mock_db, "test-user")
 
@@ -419,7 +449,7 @@ class TestAdminPromptRoutes:
     """Test admin routes for prompt management."""
 
     @patch.object(PromptService, "list_prompts")
-    async def test_admin_list_prompts(self, mock_list_prompts, mock_db):
+    async def test_admin_list_prompts(self, mock_list_prompts: AsyncMock, mock_db: MagicMock) -> None:
         """Test listing prompts through admin UI."""
         # Setup
         mock_prompt1 = MagicMock()
@@ -438,7 +468,7 @@ class TestAdminPromptRoutes:
         assert result[1] == {"id": 2, "name": "Prompt 2"}
 
     @patch.object(PromptService, "get_prompt_details")
-    async def test_admin_get_prompt(self, mock_get_prompt_details, mock_db):
+    async def test_admin_get_prompt(self, mock_get_prompt_details: AsyncMock, mock_db: MagicMock) -> None:
         """Test getting a single prompt through admin UI."""
         # Setup
         mock_get_prompt_details.return_value = {
@@ -471,7 +501,9 @@ class TestAdminPromptRoutes:
         assert result["name"] == "Prompt 1"
 
     @patch.object(PromptService, "register_prompt")
-    async def test_admin_add_prompt(self, mock_register_prompt, mock_request, mock_db):
+    async def test_admin_add_prompt(
+        self, mock_register_prompt: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test adding a prompt through admin UI."""
         # Execute
         result = await admin_add_prompt(mock_request, mock_db, "test-user")
@@ -483,7 +515,9 @@ class TestAdminPromptRoutes:
         assert "/admin#prompts" in result.headers["location"]
 
     @patch.object(PromptService, "update_prompt")
-    async def test_admin_edit_prompt(self, mock_update_prompt, mock_request, mock_db):
+    async def test_admin_edit_prompt(
+        self, mock_update_prompt: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test editing a prompt through admin UI."""
         # Execute
         result = await admin_edit_prompt("test-prompt", mock_request, mock_db, "test-user")
@@ -495,7 +529,9 @@ class TestAdminPromptRoutes:
         assert "/admin#prompts" in result.headers["location"]
 
     @patch.object(PromptService, "toggle_prompt_status")
-    async def test_admin_toggle_prompt(self, mock_toggle_status, mock_request, mock_db):
+    async def test_admin_toggle_prompt(
+        self, mock_toggle_status: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test toggling prompt status through admin UI."""
         # Execute
         result = await admin_toggle_prompt(1, mock_request, mock_db, "test-user")
@@ -507,7 +543,9 @@ class TestAdminPromptRoutes:
         assert "/admin#prompts" in result.headers["location"]
 
     @patch.object(PromptService, "delete_prompt")
-    async def test_admin_delete_prompt(self, mock_delete_prompt, mock_request, mock_db):
+    async def test_admin_delete_prompt(
+        self, mock_delete_prompt: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test deleting a prompt through admin UI."""
         result = await admin_delete_prompt("test-prompt", mock_request, mock_db, "test-user")
 
@@ -521,7 +559,7 @@ class TestAdminGatewayRoutes:
     """Test admin routes for gateway management."""
 
     @patch.object(GatewayService, "list_gateways")
-    async def test_admin_list_gateways(self, mock_list_gateways, mock_db):
+    async def test_admin_list_gateways(self, mock_list_gateways: AsyncMock, mock_db: MagicMock) -> None:
         """Test listing gateways through admin UI."""
         # Setup
         mock_gateway1 = MagicMock()
@@ -540,7 +578,7 @@ class TestAdminGatewayRoutes:
         assert result[1] == {"id": 2, "name": "Gateway 2"}
 
     @patch.object(GatewayService, "get_gateway")
-    async def test_admin_get_gateway(self, mock_get_gateway, mock_db):
+    async def test_admin_get_gateway(self, mock_get_gateway: AsyncMock, mock_db: MagicMock) -> None:
         """Test getting a single gateway through admin UI."""
         # Setup
         mock_gateway = MagicMock()
@@ -555,7 +593,9 @@ class TestAdminGatewayRoutes:
         assert result == {"id": 1, "name": "Gateway 1"}
 
     @patch.object(GatewayService, "register_gateway")
-    async def test_admin_add_gateway(self, mock_register_gateway, mock_request, mock_db):
+    async def test_admin_add_gateway(
+        self, mock_register_gateway: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test adding a gateway through admin UI."""
         # Execute
         result = await admin_add_gateway(mock_request, mock_db, "test-user")
@@ -567,7 +607,9 @@ class TestAdminGatewayRoutes:
         assert "/admin#gateways" in result.headers["location"]
 
     @patch.object(GatewayService, "update_gateway")
-    async def test_admin_edit_gateway(self, mock_update_gateway, mock_request, mock_db):
+    async def test_admin_edit_gateway(
+        self, mock_update_gateway: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test editing a gateway through admin UI."""
         # Execute
         result = await admin_edit_gateway(1, mock_request, mock_db, "test-user")
@@ -579,7 +621,9 @@ class TestAdminGatewayRoutes:
         assert "/admin#gateways" in result.headers["location"]
 
     @patch.object(GatewayService, "toggle_gateway_status")
-    async def test_admin_toggle_gateway(self, mock_toggle_status, mock_request, mock_db):
+    async def test_admin_toggle_gateway(
+        self, mock_toggle_status: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test toggling gateway status through admin UI."""
         # Execute
         result = await admin_toggle_gateway(1, mock_request, mock_db, "test-user")
@@ -591,7 +635,9 @@ class TestAdminGatewayRoutes:
         assert "/admin#gateways" in result.headers["location"]
 
     @patch.object(GatewayService, "delete_gateway")
-    async def test_admin_delete_gateway(self, mock_delete_gateway, mock_request, mock_db):
+    async def test_admin_delete_gateway(
+        self, mock_delete_gateway: AsyncMock, mock_request: MagicMock, mock_db: MagicMock
+    ) -> None:
         """Test deleting a gateway through admin UI."""
         result = await admin_delete_gateway(1, mock_request, mock_db, "test-user")
 
@@ -605,7 +651,7 @@ class TestAdminRootRoutes:
     """Test admin routes for root management."""
 
     @patch("mcpgateway.admin.root_service.add_root", new_callable=AsyncMock)
-    async def test_admin_add_root(self, mock_add_root, mock_request):
+    async def test_admin_add_root(self, mock_add_root: AsyncMock, mock_request: MagicMock) -> None:
         """Test adding a root through admin UI."""
         result = await admin_add_root(mock_request, "test-user")
 
@@ -616,7 +662,7 @@ class TestAdminRootRoutes:
         assert "/admin#roots" in result.headers["location"]
 
     @patch("mcpgateway.admin.root_service.remove_root", new_callable=AsyncMock)
-    async def test_admin_delete_root(self, mock_remove_root, mock_request):
+    async def test_admin_delete_root(self, mock_remove_root: AsyncMock, mock_request: MagicMock) -> None:
         """Test deleting a root through admin UI."""
         result = await admin_delete_root("/test/root", mock_request, "test-user")
 
@@ -645,7 +691,7 @@ class TestAdminMetricsRoutes:
         PromptService,
         aggregate_metrics=AsyncMock(return_value={"total_executions": 20}),
     )
-    async def test_admin_get_metrics(self, mock_db):
+    async def test_admin_get_metrics(self, mock_db: MagicMock) -> None:
         """Test getting metrics through admin UI."""
         # Execute
         result = await admin_get_metrics(mock_db, "test-user")
@@ -676,7 +722,7 @@ class TestAdminMetricsRoutes:
         PromptService,
         reset_metrics=AsyncMock(),
     )
-    async def test_admin_reset_metrics(self, mock_db):
+    async def test_admin_reset_metrics(self, mock_db: MagicMock) -> None:
         """Test resetting metrics through admin UI."""
         # Execute
         result = await admin_reset_metrics(mock_db, "test-user")
@@ -684,7 +730,7 @@ class TestAdminMetricsRoutes:
         # Assert
         assert result["message"] == "All metrics reset successfully"
         assert result["success"] is True
-        ToolService.reset_metrics.assert_called_once()
-        ResourceService.reset_metrics.assert_called_once()
-        ServerService.reset_metrics.assert_called_once()
-        PromptService.reset_metrics.assert_called_once()
+        ToolService.reset_metrics.assert_called_once() # type: ignore[attr-defined]
+        ResourceService.reset_metrics.assert_called_once() # type: ignore[attr-defined]
+        ServerService.reset_metrics.assert_called_once() # type: ignore[attr-defined]
+        PromptService.reset_metrics.assert_called_once() # type: ignore[attr-defined]

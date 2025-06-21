@@ -25,13 +25,13 @@ from mcpgateway.types import Message, PromptResult, Role, TextContent
 
 
 @pytest.fixture
-def prompt_service():
+def prompt_service() -> PromptService:
     """Create a prompt service instance."""
     return PromptService()
 
 
 @pytest.fixture
-def mock_prompt():
+def mock_prompt() -> MagicMock:
     """Create a mock prompt model."""
     prompt = MagicMock(spec=DbPrompt)
     prompt.id = 1
@@ -64,7 +64,7 @@ class TestPromptService:
     """Tests for the PromptService class."""
 
     @pytest.mark.asyncio
-    async def test_register_prompt(self, prompt_service, test_db):
+    async def test_register_prompt(self, prompt_service: PromptService, test_db: MagicMock) -> None:
         """Test successful prompt registration."""
         # Set up DB behavior
         mock_scalar = Mock()
@@ -75,10 +75,10 @@ class TestPromptService:
         test_db.refresh = Mock()
 
         # Set up prompt service methods
-        prompt_service._notify_prompt_added = AsyncMock()
-        prompt_service._validate_template = Mock()
-        prompt_service._get_required_arguments = Mock(return_value=set(["param"]))
-        prompt_service._convert_db_prompt = Mock(
+        prompt_service._notify_prompt_added = AsyncMock() # type: ignore[method-assign]
+        prompt_service._validate_template = Mock() # type: ignore[method-assign]
+        prompt_service._get_required_arguments = Mock(return_value=set(["param"])) # type: ignore[method-assign]
+        prompt_service._convert_db_prompt = Mock( # type: ignore[method-assign]
             return_value={
                 "id": 1,
                 "name": "test_prompt",
@@ -125,7 +125,9 @@ class TestPromptService:
         assert any(arg.name == "param" for arg in result.arguments)
 
     @pytest.mark.asyncio
-    async def test_register_prompt_name_conflict(self, prompt_service, mock_prompt, test_db):
+    async def test_register_prompt_name_conflict(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test prompt registration with name conflict."""
         # Mock DB to return existing prompt
         mock_scalar = Mock()
@@ -145,7 +147,7 @@ class TestPromptService:
         assert exc_info.value.prompt_id == mock_prompt.id
 
     @pytest.mark.asyncio
-    async def test_register_prompt_invalid_template(self, prompt_service, test_db):
+    async def test_register_prompt_invalid_template(self, prompt_service: PromptService, test_db: MagicMock) -> None:
         """Test prompt registration with invalid template."""
         # Mock DB behavior
         mock_scalar = Mock()
@@ -153,7 +155,7 @@ class TestPromptService:
         test_db.execute = Mock(return_value=mock_scalar)
 
         # Set up prompt service to fail template validation
-        prompt_service._validate_template = Mock(side_effect=PromptValidationError("Invalid template syntax"))
+        prompt_service._validate_template = Mock(side_effect=PromptValidationError("Invalid template syntax")) # type: ignore[method-assign]
 
         # Create prompt request with invalid template
         prompt_create = PromptCreate(name="test_prompt", description="A test prompt", template="This is a template with {{ invalid syntax.", arguments=[])  # Invalid Jinja template
@@ -166,7 +168,9 @@ class TestPromptService:
         test_db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_prompts(self, prompt_service, mock_prompt, test_db):
+    async def test_list_prompts(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test listing prompts."""
         # Mock DB to return a list of prompts
         mock_scalar_result = MagicMock()
@@ -195,7 +199,7 @@ class TestPromptService:
                 "last_execution_time": None,
             },
         )
-        prompt_service._convert_db_prompt = Mock(return_value=prompt_read.model_dump(by_alias=True))
+        prompt_service._convert_db_prompt = Mock(return_value=prompt_read.model_dump(by_alias=True)) # type: ignore[method-assign]
 
         # Call method
         result = await prompt_service.list_prompts(test_db)
@@ -210,7 +214,9 @@ class TestPromptService:
         prompt_service._convert_db_prompt.assert_called_once_with(mock_prompt)
 
     @pytest.mark.asyncio
-    async def test_get_prompt(self, prompt_service, mock_prompt, test_db):
+    async def test_get_prompt(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting and rendering a prompt with arguments."""
         # Mock DB to return prompt
         mock_scalar = Mock()
@@ -218,8 +224,8 @@ class TestPromptService:
         test_db.execute = Mock(return_value=mock_scalar)
 
         # Set up prompt service methods
-        prompt_service._render_template = Mock(return_value="This is a template with test value.")
-        prompt_service._parse_messages = Mock(return_value=[Message(role=Role.USER, content=TextContent(type="text", text="This is a template with test value."))])
+        prompt_service._render_template = Mock(return_value="This is a template with test value.") # type: ignore[method-assign]
+        prompt_service._parse_messages = Mock(return_value=[Message(role=Role.USER, content=TextContent(type="text", text="This is a template with test value."))]) # type: ignore[method-assign]
 
         # Call method with arguments
         result = await prompt_service.get_prompt(test_db, "test_prompt", {"param": "test value"})
@@ -235,7 +241,9 @@ class TestPromptService:
         assert result.messages[0].content.text == "This is a template with test value."
 
     @pytest.mark.asyncio
-    async def test_get_prompt_no_arguments(self, prompt_service, mock_prompt, test_db):
+    async def test_get_prompt_no_arguments(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting a prompt without arguments (template information only)."""
         # Mock DB to return prompt
         mock_scalar = Mock()
@@ -255,7 +263,7 @@ class TestPromptService:
         assert result.messages[0].content.text == mock_prompt.template
 
     @pytest.mark.asyncio
-    async def test_get_prompt_not_found(self, prompt_service, test_db):
+    async def test_get_prompt_not_found(self, prompt_service: PromptService, test_db: MagicMock) -> None:
         """Test getting a non-existent prompt."""
         # Mock DB to return None for active prompts
         mock_scalar1 = Mock()
@@ -272,7 +280,9 @@ class TestPromptService:
         assert "Prompt not found: nonexistent_prompt" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_get_prompt_inactive(self, prompt_service, mock_prompt, test_db):
+    async def test_get_prompt_inactive(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test getting an inactive prompt."""
         # Set prompt to inactive
         mock_prompt.is_active = False
@@ -293,7 +303,9 @@ class TestPromptService:
         assert "Prompt 'test_prompt' exists but is inactive" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_update_prompt(self, prompt_service, mock_prompt, test_db):
+    async def test_update_prompt(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a prompt."""
         # Mock DB to return prompt
         mock_scalar = Mock()
@@ -304,10 +316,10 @@ class TestPromptService:
         test_db.refresh = Mock()
 
         # Set up prompt service methods
-        prompt_service._notify_prompt_updated = AsyncMock()
-        prompt_service._validate_template = Mock()
-        prompt_service._get_required_arguments = Mock(return_value=set(["new_param"]))
-        prompt_service._convert_db_prompt = Mock(
+        prompt_service._notify_prompt_updated = AsyncMock() # type: ignore[method-assign]
+        prompt_service._validate_template = Mock() # type: ignore[method-assign]
+        prompt_service._get_required_arguments = Mock(return_value=set(["new_param"])) # type: ignore[method-assign]
+        prompt_service._convert_db_prompt = Mock( # type: ignore[method-assign]
             return_value={
                 "id": 1,
                 "name": "updated_prompt",
@@ -361,7 +373,7 @@ class TestPromptService:
         assert any(arg["name"] == "new_param" for arg in result.arguments)
 
     @pytest.mark.asyncio
-    async def test_update_prompt_not_found(self, prompt_service, test_db):
+    async def test_update_prompt_not_found(self, prompt_service: PromptService, test_db: MagicMock) -> None:
         """Test updating a non-existent prompt."""
         # Mock DB to return None
         mock_scalar = Mock()
@@ -382,7 +394,9 @@ class TestPromptService:
         assert "Prompt not found: nonexistent_prompt" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_update_prompt_name_conflict(self, prompt_service, mock_prompt, test_db):
+    async def test_update_prompt_name_conflict(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test updating a prompt with a name that conflicts with another prompt."""
         # Create a second prompt (the one being updated)
         prompt1 = mock_prompt
@@ -421,7 +435,9 @@ class TestPromptService:
         test_db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_prompt(self, prompt_service, mock_prompt, test_db):
+    async def test_delete_prompt(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test deleting a prompt."""
         # Mock DB to return prompt
         mock_scalar = Mock()
@@ -432,7 +448,7 @@ class TestPromptService:
         test_db.commit = Mock()
 
         # Set up prompt service methods
-        prompt_service._notify_prompt_deleted = AsyncMock()
+        prompt_service._notify_prompt_deleted = AsyncMock() # type: ignore[method-assign]
 
         # Call method
         await prompt_service.delete_prompt(test_db, "test_prompt")
@@ -445,7 +461,7 @@ class TestPromptService:
         prompt_service._notify_prompt_deleted.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_prompt_not_found(self, prompt_service, test_db):
+    async def test_delete_prompt_not_found(self, prompt_service: PromptService, test_db: MagicMock) -> None:
         """Test deleting a non-existent prompt."""
         # Mock DB to return None
         mock_scalar = Mock()
@@ -459,7 +475,9 @@ class TestPromptService:
         assert "Prompt not found: nonexistent_prompt" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_toggle_prompt_status(self, prompt_service, mock_prompt, test_db):
+    async def test_toggle_prompt_status(
+        self, prompt_service: PromptService, mock_prompt: MagicMock, test_db: MagicMock
+    ) -> None:
         """Test toggling prompt active status."""
         # Mock DB to return prompt
         test_db.get = Mock(return_value=mock_prompt)
@@ -467,9 +485,9 @@ class TestPromptService:
         test_db.refresh = Mock()
 
         # Set up prompt service methods
-        prompt_service._notify_prompt_activated = AsyncMock()
-        prompt_service._notify_prompt_deactivated = AsyncMock()
-        prompt_service._convert_db_prompt = Mock(
+        prompt_service._notify_prompt_activated = AsyncMock() # type: ignore[method-assign]
+        prompt_service._notify_prompt_deactivated = AsyncMock() # type: ignore[method-assign]
+        prompt_service._convert_db_prompt = Mock( # type: ignore[method-assign]
             return_value={
                 "id": 1,
                 "name": "test_prompt",
@@ -511,7 +529,7 @@ class TestPromptService:
         assert result.is_active is False
 
     @pytest.mark.asyncio
-    async def test_reset_metrics(self, prompt_service, test_db):
+    async def test_reset_metrics(self, prompt_service: PromptService, test_db: MagicMock) -> None:
         """Test resetting metrics."""
         # Mock DB operations
         test_db.execute = Mock()
@@ -524,7 +542,7 @@ class TestPromptService:
         test_db.execute.assert_called_once()
         test_db.commit.assert_called_once()
 
-    def test_validate_template(self, prompt_service):
+    def test_validate_template(self, prompt_service: PromptService) -> None:
         """Test template validation."""
         # Valid template
         prompt_service._validate_template("Hello {{ name }}!")
@@ -533,7 +551,7 @@ class TestPromptService:
         with pytest.raises(PromptValidationError):
             prompt_service._validate_template("Hello {{ name")
 
-    def test_get_required_arguments(self, prompt_service):
+    def test_get_required_arguments(self, prompt_service: PromptService) -> None:
         """Test extraction of required arguments from template."""
         # Test Jinja2 style variables
         template = "Hello {{ name }}! Your age is {{ age }}."
@@ -556,7 +574,7 @@ class TestPromptService:
         assert "age" in args
         assert len(args) == 2
 
-    def test_render_template(self, prompt_service):
+    def test_render_template(self, prompt_service: PromptService) -> None:
         """Test template rendering."""
         # Test Jinja2 rendering
         template = "Hello {{ name }}!"
@@ -572,7 +590,7 @@ class TestPromptService:
         with pytest.raises(PromptError):
             prompt_service._render_template("Hello {{ missing }}!", {})
 
-    def test_parse_messages(self, prompt_service):
+    def test_parse_messages(self, prompt_service: PromptService) -> None:
         """Test parsing rendered text into messages."""
         # Simple user message
         text = "This is a user message."

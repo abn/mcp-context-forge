@@ -22,7 +22,7 @@ import re
 from collections import deque
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import List, Union
+from typing import List, Union, Optional # Added Optional
 from uuid import uuid4
 
 from fastapi.security.utils import get_authorization_scheme_param
@@ -54,7 +54,7 @@ logging.basicConfig(level=logging.INFO)
 tool_service = ToolService()
 mcp_app = Server("mcp-streamable-http-stateless")
 
-server_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("server_id", default=None)
+server_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("server_id", default=None)
 
 ## ------------------------------ Event store ------------------------------
 
@@ -196,11 +196,15 @@ async def list_tools() -> List[types.Tool]:
 
     if server_id:
         try:
+            server_id_int = int(server_id) # Convert to int
             async with get_db() as db:
-                tools = await tool_service.list_server_tools(db, server_id)
+                tools = await tool_service.list_server_tools(db, server_id_int)
                 return [types.Tool(name=tool.name, description=tool.description, inputSchema=tool.input_schema) for tool in tools]
+        except ValueError:
+            logger.error(f"Invalid server_id format: {server_id}. Must be an integer.")
+            return []
         except Exception as e:
-            logger.exception(f"Error listing tools:{e}")
+            logger.exception(f"Error listing tools for server_id {server_id}: {e}")
             return []
     else:
         try:

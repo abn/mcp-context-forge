@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from mcpgateway.db import Prompt as DbPrompt
 from mcpgateway.db import PromptMetric, server_prompt_association
-from mcpgateway.schemas import PromptCreate, PromptRead, PromptUpdate
+from mcpgateway.schemas import PromptCreate, PromptRead, PromptUpdate, PromptMetrics # Added PromptMetrics
 from mcpgateway.types import Message, PromptResult, Role, TextContent
 
 logger = logging.getLogger(__name__)
@@ -179,26 +179,35 @@ class PromptService:
             self._validate_template(prompt.template)
 
             # Extract required arguments from template
-            required_args = self._get_required_arguments(prompt.template)
+            required_args_set: Set[str] = self._get_required_arguments(prompt.template)
 
             # Create argument schema
-            argument_schema = {
+            properties_schema: Dict[str, Dict[str, Any]] = {}
+            if prompt.arguments:
+                for arg_data in prompt.arguments:
+                    if not arg_data.name: # Should be validated by Pydantic model of PromptCreate if name is required there
+                        raise PromptValidationError("Argument name is required in PromptCreate arguments.")
+                    prop_detail: Dict[str, Any] = {"type": "string"} # Default type
+                    if arg_data.description is not None:
+                        prop_detail["description"] = arg_data.description
+                    # If PromptArgument had a 'type' field, it would be used here:
+                    # if hasattr(arg_data, 'type') and arg_data.type:
+                    #    prop_detail["type"] = arg_data.type
+                    properties_schema[arg_data.name] = prop_detail
+
+            final_argument_schema: Dict[str, Any] = {
                 "type": "object",
-                "properties": {},
-                "required": list(required_args),
+                "properties": properties_schema,
             }
-            for arg in prompt.arguments:
-                schema = {"type": "string"}
-                if arg.description is not None:
-                    schema["description"] = arg.description
-                argument_schema["properties"][arg.name] = schema
+            if required_args_set: # Only add 'required' if not empty
+                final_argument_schema["required"] = list(required_args_set)
 
             # Create DB model
             db_prompt = DbPrompt(
                 name=prompt.name,
                 description=prompt.description,
                 template=prompt.template,
-                argument_schema=argument_schema,
+                argument_schema=final_argument_schema,
             )
 
             # Add to DB
@@ -360,19 +369,38 @@ class PromptService:
             if prompt_update.template is not None:
                 prompt.template = prompt_update.template
                 self._validate_template(prompt.template)
-            if prompt_update.arguments is not None:
-                required_args = self._get_required_arguments(prompt.template)
-                argument_schema = {
-                    "type": "object",
-                    "properties": {},
-                    "required": list(required_args),
-                }
-                for arg in prompt_update.arguments:
-                    schema = {"type": "string"}
-                    if arg.description is not None:
-                        schema["description"] = arg.description
-                    argument_schema["properties"][arg.name] = schema
-                prompt.argument_schema = argument_schema
+
+            # Argument schema regeneration logic, similar to register_prompt
+            # This ensures that if the template changes, required_args are updated,
+            # and if arguments are explicitly provided in update, they are used.
+            current_template = prompt.template # Use updated template if changed, else old one
+            required_args_set: Set[str] = self._get_required_arguments(current_template)
+
+            properties_schema: Dict[str, Dict[str, Any]] = {}
+            # Use arguments from prompt_update if provided, otherwise try to reconstruct from existing schema or leave empty
+            args_to_process = prompt_update.arguments
+
+            if args_to_process:
+                for arg_data in args_to_process:
+                    if not arg_data.name:
+                        raise PromptValidationError("Argument name is required in PromptUpdate arguments.")
+                    prop_detail: Dict[str, Any] = {"type": "string"} # Default type
+                    if arg_data.description is not None:
+                        prop_detail["description"] = arg_data.description
+                    properties_schema[arg_data.name] = prop_detail
+            elif prompt.argument_schema and "properties" in prompt.argument_schema:
+                 # If not updating arguments, try to preserve existing properties if possible
+                 # This might need more sophisticated merging if only some args are updated
+                 properties_schema = prompt.argument_schema["properties"]
+
+            final_argument_schema: Dict[str, Any] = {
+                "type": "object",
+                "properties": properties_schema,
+            }
+            if required_args_set: # Use newly derived required args
+                final_argument_schema["required"] = list(required_args_set)
+
+            prompt.argument_schema = final_argument_schema
 
             prompt.updated_at = datetime.utcnow()
             db.commit()
@@ -551,7 +579,7 @@ class PromptService:
         """
         messages = []
         current_role = Role.USER
-        current_text = []
+        current_text: List[str] = []
         for line in text.split("\n"):
             if line.startswith("# Assistant:"):
                 if current_text:
@@ -689,7 +717,7 @@ class PromptService:
             await queue.put(event)
 
     # --- Metrics ---
-    async def aggregate_metrics(self, db: Session) -> Dict[str, Any]:
+    async def aggregate_metrics(self, db: Session) -> PromptMetrics:
         """
         Aggregate metrics for all prompt invocations.
 
@@ -717,16 +745,16 @@ class PromptService:
         avg_rt = db.execute(select(func.avg(PromptMetric.response_time))).scalar()
         last_time = db.execute(select(func.max(PromptMetric.timestamp))).scalar()
 
-        return {
-            "total_executions": total,
-            "successful_executions": successful,
-            "failed_executions": failed,
-            "failure_rate": failure_rate,
-            "min_response_time": min_rt,
-            "max_response_time": max_rt,
-            "avg_response_time": avg_rt,
-            "last_execution_time": last_time,
-        }
+        return PromptMetrics(
+            total_executions=total,
+            successful_executions=successful,
+            failed_executions=failed,
+            failure_rate=failure_rate,
+            min_response_time=min_rt,
+            max_response_time=max_rt,
+            avg_response_time=avg_rt,
+            last_execution_time=last_time,
+        )
 
     async def reset_metrics(self, db: Session) -> None:
         """

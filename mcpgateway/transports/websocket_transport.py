@@ -5,11 +5,12 @@ Copyright 2025
 SPDX-License-Identifier: Apache-2.0
 Authors: Mihai Criveti
 
-This module implements WebSocket transport for MCP, providing
-full-duplex communication between client and server.
+This module implements WebSocket transport for MCP, handling
+bidirectional JSON-RPC communication over a WebSocket connection.
 """
 
 import asyncio
+import json
 import logging
 from typing import Any, AsyncGenerator, Dict, Optional
 
@@ -22,118 +23,127 @@ logger = logging.getLogger(__name__)
 
 
 class WebSocketTransport(Transport):
-    """Transport implementation using WebSocket."""
+    """Transport implementation using WebSockets."""
 
     def __init__(self, websocket: WebSocket):
         """Initialize WebSocket transport.
 
         Args:
-            websocket: FastAPI WebSocket connection
+            websocket: FastAPI WebSocket connection object.
         """
-        self._websocket = websocket
+        self.websocket = websocket
         self._connected = False
-        self._ping_task: Optional[asyncio.Task] = None
+        self._ping_task: Optional[asyncio.Task[None]] = None
 
     async def connect(self) -> None:
-        """Set up WebSocket connection."""
-        await self._websocket.accept()
+        """Accept WebSocket connection and start ping loop."""
+        await self.websocket.accept()
         self._connected = True
-
-        # Start ping task
-        if settings.websocket_ping_interval > 0:
-            self._ping_task = asyncio.create_task(self._ping_loop())
-
-        logger.info("WebSocket transport connected")
+        self._ping_task = asyncio.create_task(self._ping_loop())
+        logger.info(f"WebSocket connected: {self.websocket.client}")
 
     async def disconnect(self) -> None:
-        """Clean up WebSocket connection."""
+        """Close WebSocket connection and stop ping loop."""
         if self._ping_task:
             self._ping_task.cancel()
             try:
                 await self._ping_task
             except asyncio.CancelledError:
                 pass
-
+            self._ping_task = None
         if self._connected:
-            await self._websocket.close()
+            try:
+                await self.websocket.close()
+            except RuntimeError as e: # Handle cases where socket is already closed
+                logger.warning(f"Error closing websocket (already closed?): {e}")
             self._connected = False
-            logger.info("WebSocket transport disconnected")
+            logger.info(f"WebSocket disconnected: {self.websocket.client}")
+
 
     async def send_message(self, message: Dict[str, Any]) -> None:
-        """Send a message over WebSocket.
+        """Send a JSON message over WebSocket.
 
         Args:
-            message: Message to send
+            message: Message to send.
 
         Raises:
-            RuntimeError: If transport is not connected
-            Exception: If unable to send json to websocket
+            RuntimeError: If transport is not connected.
         """
         if not self._connected:
             raise RuntimeError("Transport not connected")
+        await self.websocket.send_json(message)
 
-        try:
-            await self._websocket.send_json(message)
-        except Exception as e:
-            logger.error(f"Failed to send message: {e}")
-            raise
-
-    async def receive_message(self) -> AsyncGenerator[Dict[str, Any], None]:
-        """Receive messages from WebSocket.
+    async def receive_message(self) -> AsyncGenerator[Dict[str, Any], None]: # type: ignore[override]
+        """Receive JSON messages from WebSocket.
 
         Yields:
-            Received messages
+            Received messages.
 
         Raises:
-            RuntimeError: If transport is not connected
+            RuntimeError: If transport is not connected.
         """
         if not self._connected:
             raise RuntimeError("Transport not connected")
-
         try:
             while True:
-                message = await self._websocket.receive_json()
-                yield message
-
+                data = await self.websocket.receive_json()
+                yield data
         except WebSocketDisconnect:
-            logger.info("WebSocket client disconnected")
-            self._connected = False
+            logger.info(f"WebSocket disconnected by client: {self.websocket.client}")
+            await self.disconnect() # Ensure internal state is updated and ping loop stops
         except Exception as e:
-            logger.error(f"Error receiving message: {e}")
-            self._connected = False
-        finally:
-            await self.disconnect()
+            logger.error(f"WebSocket receive error: {e}")
+            await self.disconnect() # Disconnect on other errors too
+            # Re-raise other exceptions to be handled by the caller if necessary
+            # For example, if it's a JSONDecodeError, it might be an invalid message
+            if not isinstance(e, json.JSONDecodeError): # Don't re-raise disconnects as they are handled
+                 raise
+
 
     async def is_connected(self) -> bool:
         """Check if transport is connected.
 
         Returns:
-            True if connected
+            True if connected.
         """
         return self._connected
 
-    async def _ping_loop(self) -> None:
-        """Send periodic ping messages to keep connection alive."""
-        try:
-            while self._connected:
-                await asyncio.sleep(settings.websocket_ping_interval)
-                await self._websocket.send_bytes(b"ping")
-                try:
-                    resp = await asyncio.wait_for(
-                        self._websocket.receive_bytes(),
-                        timeout=settings.websocket_ping_interval / 2,
-                    )
-                    if resp != b"pong":
-                        logger.warning("Invalid ping response")
-                except asyncio.TimeoutError:
-                    logger.warning("Ping timeout")
-                    break
-        except Exception as e:
-            logger.error(f"Ping loop error: {e}")
-        finally:
-            await self.disconnect()
-
     async def send_ping(self) -> None:
-        """Send a manual ping message."""
+        """Send a WebSocket ping frame."""
         if self._connected:
-            await self._websocket.send_bytes(b"ping")
+            try:
+                await self.websocket.send_bytes(b"ping") # Standard WebSocket ping/pong uses opcodes, not custom bytes.
+                                                       # For a custom ping, client needs to handle it.
+                                                       # Consider using standard PING opcode if client/server supports.
+                                                       # For now, sending bytes as a custom ping.
+            except Exception as e:
+                logger.warning(f"Failed to send ping: {e}")
+                await self.disconnect()
+
+
+    async def _ping_loop(self) -> None:
+        """Periodically send pings to keep connection alive."""
+        while self._connected:
+            await asyncio.sleep(settings.websocket_ping_interval)
+            if self._connected: # Re-check after sleep
+                await self.send_ping()
+                # Optionally, wait for a pong here if implementing a custom pong response
+                # try:
+                #     pong_waiter = await asyncio.wait_for(self.websocket.receive_bytes(), timeout=5)
+                #     if pong_waiter != b"pong": # Example custom pong
+                #         logger.warning("Pong not received or incorrect.")
+                #         await self.disconnect()
+                #         break
+                # except asyncio.TimeoutError:
+                #     logger.warning("Pong receive timeout.")
+                #     await self.disconnect()
+                #     break
+                # except WebSocketDisconnect: # Already handled by receive_message
+                #     break
+                # except Exception as e:
+                #     logger.error(f"Error in pong handling: {e}")
+                #     await self.disconnect()
+                #     break
+            else:
+                break
+        logger.debug("Ping loop ended.")

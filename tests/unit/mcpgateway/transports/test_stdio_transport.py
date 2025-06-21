@@ -11,6 +11,7 @@ communication over standard input/output streams.
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict, List # Added List
 
 import pytest
 
@@ -18,7 +19,7 @@ from mcpgateway.transports.stdio_transport import StdioTransport
 
 
 @pytest.fixture
-def stdio_transport():
+def stdio_transport() -> StdioTransport:
     """Create a StdioTransport instance for testing."""
     return StdioTransport()
 
@@ -27,7 +28,7 @@ class TestStdioTransport:
     """Test suite for the StdioTransport class."""
 
     @patch("asyncio.get_running_loop")
-    async def test_connect(self, mock_get_loop, stdio_transport):
+    async def test_connect(self, mock_get_loop: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test establishing a connection."""
         # Set up mocks
         mock_loop = MagicMock()
@@ -55,7 +56,7 @@ class TestStdioTransport:
         assert stdio_transport._connected is True
 
     @patch("asyncio.StreamWriter")
-    async def test_disconnect(self, mock_writer, stdio_transport):
+    async def test_disconnect(self, mock_writer: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test closing a connection."""
         # Set up mock
         stdio_transport._stdout_writer = mock_writer
@@ -71,7 +72,7 @@ class TestStdioTransport:
         # Verify the connection state
         assert stdio_transport._connected is False
 
-    async def test_disconnect_not_connected(self, stdio_transport):
+    async def test_disconnect_not_connected(self, stdio_transport: StdioTransport) -> None:
         """Test disconnecting when not connected."""
         # Ensure not connected
         stdio_transport._stdout_writer = None
@@ -83,7 +84,7 @@ class TestStdioTransport:
         # Verify the connection state
         assert stdio_transport._connected is False
 
-    async def test_send_message_not_connected(self, stdio_transport):
+    async def test_send_message_not_connected(self, stdio_transport: StdioTransport) -> None:
         """Test sending a message when not connected."""
         # Ensure not connected
         stdio_transport._stdout_writer = None
@@ -94,7 +95,7 @@ class TestStdioTransport:
             await stdio_transport.send_message({"type": "test"})
 
     @patch("asyncio.StreamWriter")
-    async def test_send_message(self, mock_writer, stdio_transport):
+    async def test_send_message(self, mock_writer: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test sending a message."""
         # Set up mock
         stdio_transport._stdout_writer = mock_writer
@@ -112,7 +113,7 @@ class TestStdioTransport:
         assert b'{"type": "test", "data": "message"}\n' == call_args
 
     @patch("asyncio.StreamWriter")
-    async def test_send_message_exception(self, mock_writer, stdio_transport):
+    async def test_send_message_exception(self, mock_writer: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test sending a message when an error occurs."""
         # Set up mock with an exception
         stdio_transport._stdout_writer = mock_writer
@@ -123,7 +124,7 @@ class TestStdioTransport:
         with pytest.raises(Exception, match="Write error"):
             await stdio_transport.send_message({"type": "test"})
 
-    async def test_receive_message_not_connected(self, stdio_transport):
+    async def test_receive_message_not_connected(self, stdio_transport: StdioTransport) -> None:
         """Test receiving messages when not connected."""
         # Ensure not connected
         stdio_transport._stdin_reader = None
@@ -135,7 +136,7 @@ class TestStdioTransport:
                 pass
 
     @patch("asyncio.StreamReader")
-    async def test_receive_message(self, mock_reader, stdio_transport):
+    async def test_receive_message(self, mock_reader: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test receiving messages."""
         # Set up mock with two messages followed by EOF
         stdio_transport._stdin_reader = mock_reader
@@ -148,7 +149,7 @@ class TestStdioTransport:
         mock_reader.readline = AsyncMock(side_effect=[message1, message2, b""])
 
         # Collect received messages
-        received = []
+        received: List[Dict[str, Any]] = []
         async for message in stdio_transport.receive_message():
             received.append(message)
 
@@ -159,7 +160,7 @@ class TestStdioTransport:
         assert received[1] == {"type": "message2", "data": "test2"}
 
     @patch("asyncio.StreamReader")
-    async def test_receive_message_exception(self, mock_reader, stdio_transport):
+    async def test_receive_message_exception(self, mock_reader: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test receiving messages when a non-fatal error occurs."""
         # Set up mock with a valid message, then an invalid one, then EOF
         stdio_transport._stdin_reader = mock_reader
@@ -172,7 +173,7 @@ class TestStdioTransport:
         mock_reader.readline = AsyncMock(side_effect=[message1, invalid_message, b""])
 
         # Collect received messages (should only get the valid one)
-        received = []
+        received: List[Dict[str, Any]] = []
         async for message in stdio_transport.receive_message():
             received.append(message)
 
@@ -182,22 +183,22 @@ class TestStdioTransport:
         assert received[0] == {"type": "message1", "data": "test1"}
 
     @patch("asyncio.StreamReader")
-    async def test_receive_message_cancellation(self, mock_reader, stdio_transport):
+    async def test_receive_message_cancellation(self, mock_reader: MagicMock, stdio_transport: StdioTransport) -> None:
         """Test receiving messages with cancellation."""
         # Set up mock with a message
         stdio_transport._stdin_reader = mock_reader
         stdio_transport._connected = True
 
-        message = b'{"type": "message", "data": "test"}\n'
+        message_bytes = b'{"type": "message", "data": "test"}\n'
 
         # Configure the mock to return a message and then raise a cancellation
-        mock_reader.readline = AsyncMock(side_effect=[message, asyncio.CancelledError()])
+        mock_reader.readline = AsyncMock(side_effect=[message_bytes, asyncio.CancelledError()])
 
         # Collect received messages until cancellation
-        received = []
+        received: List[Dict[str, Any]] = []
         try:
-            async for message in stdio_transport.receive_message():
-                received.append(message)
+            async for message_dict in stdio_transport.receive_message():
+                received.append(message_dict)
         except asyncio.CancelledError:
             pass  # Expected
 
@@ -206,7 +207,7 @@ class TestStdioTransport:
         assert len(received) == 1
         assert received[0] == {"type": "message", "data": "test"}
 
-    async def test_is_connected(self, stdio_transport):
+    async def test_is_connected(self, stdio_transport: StdioTransport) -> None:
         """Test checking connection status."""
         # Test when not connected
         stdio_transport._connected = False
@@ -218,30 +219,33 @@ class TestStdioTransport:
 
     @patch.object(asyncio, "StreamReader")
     @patch.object(asyncio, "get_running_loop")
-    async def test_full_lifecycle(self, mock_get_loop, mock_stream_reader, stdio_transport):
+    async def test_full_lifecycle(
+        self, mock_get_loop: MagicMock, mock_stream_reader_cls: MagicMock, stdio_transport: StdioTransport
+    ) -> None:
         """Test a full lifecycle of connect, send/receive, and disconnect."""
         # Set up mocks
         mock_loop = MagicMock()
         mock_get_loop.return_value = mock_loop
 
-        mock_reader = MagicMock()
-        mock_reader_protocol = MagicMock()
+        mock_reader_instance = MagicMock(spec=asyncio.StreamReader) # Instance for _stdin_reader
+        mock_reader_protocol = MagicMock() # For connect_read_pipe return
 
-        mock_transport = MagicMock()
-        mock_protocol = MagicMock()
-        mock_writer = MagicMock()
+        mock_transport = MagicMock() # For connect_write_pipe return
+        mock_writer_protocol = MagicMock() # For connect_write_pipe return (renamed for clarity)
+        mock_writer_instance = MagicMock(spec=asyncio.StreamWriter) # Instance for _stdout_writer
 
         # Mock the connect_read_pipe and connect_write_pipe methods
-        mock_loop.connect_read_pipe = AsyncMock(return_value=(mock_reader_protocol, mock_protocol))
-        mock_loop.connect_write_pipe = AsyncMock(return_value=(mock_transport, mock_protocol))
+        mock_loop.connect_read_pipe = AsyncMock(return_value=(mock_reader_protocol, mock_reader_protocol)) # protocol is ReaderProtocol
+        mock_loop.connect_write_pipe = AsyncMock(return_value=(mock_transport, mock_writer_protocol)) # protocol is Protocol
 
-        # Add stdout writer
-        stdio_transport._stdout_writer = mock_writer
+        # Assign instances to the transport
+        stdio_transport._stdout_writer = mock_writer_instance
+        stdio_transport._stdin_reader = mock_reader_instance
+
 
         # Configure reader with a test message
-        mock_message = b'{"type": "test", "content": "hello"}\n'
-        mock_reader.readline = AsyncMock(return_value=mock_message)
-        stdio_transport._stdin_reader = mock_reader
+        mock_message_bytes = b'{"type": "test", "content": "hello"}\n'
+        mock_reader_instance.readline = AsyncMock(side_effect=[mock_message_bytes, b""]) # Add EOF
 
         # Test connect
         await stdio_transport.connect()
@@ -252,19 +256,20 @@ class TestStdioTransport:
 
         # Test send_message
         await stdio_transport.send_message({"type": "response", "content": "world"})
-        mock_writer.write.assert_called_once()
-        mock_writer.drain.assert_called_once()
+        mock_writer_instance.write.assert_called_once()
+        mock_writer_instance.drain.assert_called_once()
 
         # Test receive_message
-        async def get_first_message():
-            async for message in stdio_transport.receive_message():
-                return message
+        async def get_first_message() -> Dict[str, Any]:
+            async for message_dict in stdio_transport.receive_message():
+                return message_dict
+            raise AssertionError("No message received") # Should not happen
 
-        message = await get_first_message()
-        assert message == {"type": "test", "content": "hello"}
+        message_data = await get_first_message()
+        assert message_data == {"type": "test", "content": "hello"}
 
         # Test disconnect
         await stdio_transport.disconnect()
         assert stdio_transport._connected is False
-        mock_writer.close.assert_called_once()
-        mock_writer.wait_closed.assert_called_once()
+        mock_writer_instance.close.assert_called_once()
+        mock_writer_instance.wait_closed.assert_called_once()

@@ -51,7 +51,6 @@ class Settings(BaseSettings):
     host: str = Field("127.0.0.1", env="HOST")
     port: int = Field(4444, env="PORT")
     database_url: str = "sqlite:///./mcp.db"
-    templates_dir: Path = Path("mcpgateway/templates")
     # Absolute paths resolved at import-time (still override-able via env vars)
     templates_dir: Path = Field(
         default=files("mcpgateway") / "templates",
@@ -363,7 +362,7 @@ def jsonpath_modifier(data: Any, jsonpath: str = "$[*]", mappings: Optional[Dict
     if mappings:
         mapped_results = []
         for item in results:
-            mapped_item = {}
+            mapped_item: Dict[str, Any] = {}
             for new_key, mapping_expr_str in mappings.items():
                 try:
                     mapping_expr = parse(mapping_expr_str)

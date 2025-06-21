@@ -20,20 +20,23 @@ from mcpgateway.types import InitializeResult, ResourceContent, ServerCapabiliti
 PROTOCOL_VERSION = os.getenv("PROTOCOL_VERSION", "2025-03-26")
 
 
+from fastapi import FastAPI
+from typing import Dict, Any # Added Any
+
 @pytest.fixture
-def test_client(app):
+def test_client(app: FastAPI) -> TestClient:
     """Create a test client for the app."""
     return TestClient(app)
 
 
 @pytest.fixture
-def mock_jwt_token():
+def mock_jwt_token() -> str:
     """Create a mock JWT token."""
     return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXIiLCJleHAiOjk5OTk5OTk5OTl9.this_is_a_test_token"
 
 
 @pytest.fixture
-def auth_headers(mock_jwt_token):
+def auth_headers(mock_jwt_token: str) -> Dict[str, str]:
     """Create headers with authentication."""
     return {"Authorization": f"Bearer {mock_jwt_token}"}
 
@@ -41,20 +44,20 @@ def auth_headers(mock_jwt_token):
 class TestAPIEndpoints:
     """Tests for the API endpoints."""
 
-    def test_health_check(self, test_client):
+    def test_health_check(self, test_client: TestClient) -> None:
         """Test the health check endpoint."""
         response = test_client.get("/health")
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
 
-    def test_ready_check(self, test_client):
+    def test_ready_check(self, test_client: TestClient) -> None:
         """Test the readiness check endpoint."""
         response = test_client.get("/ready")
         # The readiness check returns 200 if DB is reachable
         assert response.status_code == 200
         assert response.json()["status"] == "ready"
 
-    def test_version_partial_html(self, test_client, auth_headers):
+    def test_version_partial_html(self, test_client: TestClient, auth_headers: Dict[str, str]) -> None:
         """Test the /version endpoint with partial=true returns HTML fragment."""
         response = test_client.get("/version?partial=true", headers=auth_headers)
         assert response.status_code == 200
@@ -63,7 +66,7 @@ class TestAPIEndpoints:
         assert "Version and Environment Info" in content
         assert "App:" in content
 
-    def test_admin_ui_contains_version_tab(self, test_client, auth_headers):
+    def test_admin_ui_contains_version_tab(self, test_client: TestClient, auth_headers: Dict[str, str]) -> None:
         """Test the Admin UI contains the Version and Environment Info tab."""
         response = test_client.get("/admin", headers=auth_headers)
         assert response.status_code == 200
@@ -71,20 +74,20 @@ class TestAPIEndpoints:
         assert 'id="tab-version-info"' in content
         assert "Version and Environment Info" in content
 
-    def test_version_partial_htmx_load(self, test_client, auth_headers):
+    def test_version_partial_htmx_load(self, test_client: TestClient, auth_headers: Dict[str, str]) -> None:
         """Test HTMX request to /version?partial=true returns the partial HTML."""
         response = test_client.get("/version?partial=true", headers=auth_headers)
         assert response.status_code == 200
         assert "Version and Environment Info" in response.text
         assert "<div" in response.text
 
-    def test_root_redirect(self, test_client):
+    def test_root_redirect(self, test_client: TestClient) -> None:
         """Test root path redirects to admin."""
         response = test_client.get("/", allow_redirects=False)
         assert response.status_code == 307
         assert response.headers["location"] == "/admin"
 
-    def test_static_files(self, test_client):
+    def test_static_files(self, test_client: TestClient) -> None:
         """Test static files are served."""
         with patch("os.path.exists", return_value=True):
             with patch("builtins.open", MagicMock()):
@@ -95,7 +98,9 @@ class TestAPIEndpoints:
 
     @patch("mcpgateway.main.validate_request")
     @patch("mcpgateway.main.handle_initialize_logic")
-    def test_initialize_endpoint(self, mock_handle_initialize, mock_validate, test_client, auth_headers):
+    def test_initialize_endpoint(
+        self, mock_handle_initialize: MagicMock, mock_validate: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test the initialize endpoint."""
         # Set up mocks
         mock_capabilities = ServerCapabilities(
@@ -130,7 +135,7 @@ class TestAPIEndpoints:
         mock_handle_initialize.assert_called_once()
 
     @patch("mcpgateway.main.validate_request")
-    def test_ping_endpoint(self, mock_validate, test_client, auth_headers):
+    def test_ping_endpoint(self, mock_validate: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]) -> None:
         """Test the ping endpoint."""
         # Test request
         request_data = {"jsonrpc": "2.0", "method": "ping", "id": "test-id"}
@@ -145,7 +150,9 @@ class TestAPIEndpoints:
         assert result["result"] == {}
 
     @patch("mcpgateway.main.server_service.list_servers")
-    def test_list_servers_endpoint(self, mock_list_servers, test_client, auth_headers):
+    def test_list_servers_endpoint(
+        self, mock_list_servers: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test listing servers endpoint."""
         # Set up mock
         mock_servers = [
@@ -188,7 +195,9 @@ class TestAPIEndpoints:
         mock_list_servers.assert_called_once()
 
     @patch("mcpgateway.main.tool_service.list_tools")
-    def test_list_tools_endpoint(self, mock_list_tools, test_client, auth_headers):
+    def test_list_tools_endpoint(
+        self, mock_list_tools: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test listing tools endpoint."""
         # Set up mock
         mock_tools = [
@@ -235,7 +244,9 @@ class TestAPIEndpoints:
         mock_list_tools.assert_called_once()
 
     @patch("mcpgateway.main.resource_service.list_resources")
-    def test_list_resources_endpoint(self, mock_list_resources, test_client, auth_headers):
+    def test_list_resources_endpoint(
+        self, mock_list_resources: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test listing resources endpoint."""
         # Set up mock
         mock_resources = [
@@ -277,7 +288,9 @@ class TestAPIEndpoints:
         mock_list_resources.assert_called_once()
 
     @patch("mcpgateway.main.resource_service.read_resource")
-    def test_read_resource_endpoint(self, mock_read_resource, test_client, auth_headers):
+    def test_read_resource_endpoint(
+        self, mock_read_resource: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test reading a resource endpoint."""
         # Set up mock
         mock_content = ResourceContent(type="resource", uri="test/resource", mime_type="text/plain", text="This is test content")
@@ -297,7 +310,9 @@ class TestAPIEndpoints:
         mock_read_resource.assert_called_once()
 
     @patch("mcpgateway.main.tool_service.invoke_tool")
-    def test_rpc_tool_invocation(self, mock_invoke_tool, test_client, auth_headers):
+    def test_rpc_tool_invocation(
+        self, mock_invoke_tool: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test tool invocation via RPC endpoint."""
         # Set up test data
         tool_name = "test_tool"
@@ -321,11 +336,13 @@ class TestAPIEndpoints:
         assert result["content"][0]["text"] == "Tool response"
 
         # Verify mock called
-        mock_invoke_tool.assert_called_once_with(ANY, tool_name, tool_args)
+        mock_invoke_tool.assert_called_once_with(Any, tool_name, tool_args)
 
     @patch("mcpgateway.main.prompt_service.get_prompt")
     @patch("mcpgateway.main.validate_request")
-    def test_rpc_prompt_get(self, mock_validate, mock_get_prompt, test_client, auth_headers):
+    def test_rpc_prompt_get(
+        self, mock_validate: MagicMock, mock_get_prompt: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]
+    ) -> None:
         """Test getting a prompt via RPC endpoint."""
         # Set up test data
         prompt_name = "test_prompt"
@@ -348,10 +365,10 @@ class TestAPIEndpoints:
         assert result["messages"][0]["content"]["text"] == "Rendered prompt"
 
         # Verify mock called
-        mock_get_prompt.assert_called_once_with(ANY, prompt_name, prompt_args)
+        mock_get_prompt.assert_called_once_with(Any, prompt_name, prompt_args)
 
     @patch("mcpgateway.main.validate_request")
-    def test_invalid_request(self, mock_validate, test_client, auth_headers):
+    def test_invalid_request(self, mock_validate: MagicMock, test_client: TestClient, auth_headers: Dict[str, str]) -> None:
         """Test handling of invalid RPC requests."""
         # Set up mock to raise error
         mock_validate.side_effect = Exception("Invalid request")

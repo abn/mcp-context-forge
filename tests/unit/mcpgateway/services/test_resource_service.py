@@ -19,16 +19,19 @@ from mcpgateway.services.resource_service import (
 )
 
 
+from mcpgateway.db import Resource as DbResource
+
+
 @pytest.fixture
-def resource_service():
+def resource_service() -> ResourceService:
     """Create a ResourceService instance."""
     return ResourceService()
 
 
 @pytest.fixture
-def mock_resource():
+def mock_resource() -> Mock:
     """Create a mock resource model."""
-    resource = Mock()
+    resource = Mock(spec=DbResource)
     resource.id = 1
     resource.uri = "test/resource"
     resource.name = "Test Resource"
@@ -73,7 +76,9 @@ class TestResourceService:
     """Tests for the ResourceService class."""
 
     @pytest.mark.asyncio
-    async def test_register_resource(self, resource_service, mock_resource, test_db):
+    async def test_register_resource(
+        self, resource_service: ResourceService, mock_resource: Mock, test_db: MagicMock
+    ) -> None:
         """Test successful resource registration."""
         # Create a resource request
         create_resource = ResourceCreate(
@@ -94,10 +99,10 @@ class TestResourceService:
         test_db.refresh = Mock()
 
         # Set up mock for resource_service methods
-        resource_service._is_valid_uri = Mock(return_value=True)
-        resource_service._detect_mime_type = Mock(return_value="text/plain")
-        resource_service._notify_resource_added = AsyncMock()
-        resource_service._convert_resource_to_read = Mock(
+        resource_service._is_valid_uri = Mock(return_value=True) # type: ignore[method-assign]
+        resource_service._detect_mime_type = Mock(return_value="text/plain") # type: ignore[method-assign]
+        resource_service._notify_resource_added = AsyncMock() # type: ignore[method-assign]
+        resource_service._convert_resource_to_read = Mock( # type: ignore[method-assign]
             return_value=ResourceRead(
                 id=1,
                 uri="test/resource",
@@ -138,7 +143,9 @@ class TestResourceService:
         resource_service._notify_resource_added.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_register_resource_conflict(self, resource_service, mock_resource, test_db):
+    async def test_register_resource_conflict(
+        self, resource_service: ResourceService, mock_resource: Mock, test_db: MagicMock
+    ) -> None:
         """Test resource registration with URI conflict."""
         create_resource = ResourceCreate(
             uri="existing/resource",
@@ -159,7 +166,9 @@ class TestResourceService:
         assert "Resource already exists with URI" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_read_resource(self, resource_service, mock_resource, test_db):
+    async def test_read_resource(
+        self, resource_service: ResourceService, mock_resource: Mock, test_db: MagicMock
+    ) -> None:
         """Test reading a resource."""
         uri = "test/resource"
 
@@ -170,7 +179,7 @@ class TestResourceService:
 
         # Make a mock for the content property
         content_mock = MagicMock()
-        type(mock_resource).content = property(lambda self: content_mock)
+        type(mock_resource).content = property(lambda self: content_mock) # type: ignore
 
         result = await resource_service.read_resource(test_db, uri)
 
@@ -178,7 +187,7 @@ class TestResourceService:
         assert result == content_mock
 
     @pytest.mark.asyncio
-    async def test_read_resource_not_found(self, resource_service, test_db):
+    async def test_read_resource_not_found(self, resource_service: ResourceService, test_db: MagicMock) -> None:
         """Test reading a non-existent resource."""
         uri = "nonexistent/resource"
 
@@ -193,7 +202,9 @@ class TestResourceService:
         assert "Resource not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_delete_resource(self, resource_service, mock_resource, test_db):
+    async def test_delete_resource(
+        self, resource_service: ResourceService, mock_resource: Mock, test_db: MagicMock
+    ) -> None:
         """Test deleting a resource."""
         uri = "test/resource"
 
@@ -207,7 +218,7 @@ class TestResourceService:
         test_db.commit = Mock()
 
         # Mock notification
-        resource_service._notify_resource_deleted = AsyncMock()
+        resource_service._notify_resource_deleted = AsyncMock() # type: ignore[method-assign]
 
         # Call the method under test
         await resource_service.delete_resource(test_db, uri)
@@ -228,7 +239,7 @@ class TestResourceService:
             ("invalid-uri", False),
         ],
     )
-    def test_is_valid_uri(self, resource_service, uri, expected_result):
+    def test_is_valid_uri(self, resource_service: ResourceService, uri: str, expected_result: bool) -> None:
         """Test URI validation."""
         # Use the actual method rather than mocking
         result = resource_service._is_valid_uri(uri)

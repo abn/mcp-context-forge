@@ -276,22 +276,29 @@ async def _run_stdio_to_sse(cmd: str, port: int, log_level: str = "info") -> Non
 
     shutting_down = asyncio.Event()  # 🔄 make shutdown idempotent
 
-    async def _shutdown() -> None:
+    async def _shutdown_async_tasks() -> None:
         if shutting_down.is_set():
             return
         shutting_down.set()
-        LOGGER.info("Shutting down …")
+        LOGGER.info("Shutting down async tasks…")
         await stdio.stop()
         await server.shutdown()
 
+    def _signal_handler_callback(sig_num: int) -> None:
+        LOGGER.info("Signal %s received, scheduling shutdown.", signal.Signals(sig_num).name)
+        asyncio.create_task(_shutdown_async_tasks())
+
     loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
+    for sig_val in (signal.SIGINT, signal.SIGTERM):
         with suppress(NotImplementedError):  # Windows lacks add_signal_handler
-            loop.add_signal_handler(sig, lambda _s=sig: asyncio.create_task(_shutdown()))
+            loop.add_signal_handler(sig_val, _signal_handler_callback, sig_val)
 
     LOGGER.info("Bridge ready → http://127.0.0.1:%s/sse", port)
     await server.serve()
-    await _shutdown()  # final cleanup
+    # Ensure shutdown is called if server.serve() exits cleanly (e.g. via server.should_exit)
+    # or if an unhandled exception occurs before/during serve()
+    if not shutting_down.is_set(): # If not already shut down by signal
+        await _shutdown_async_tasks()
 
 
 def main(argv: Optional[Sequence[str]] | None = None) -> None:  # entry-point

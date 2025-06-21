@@ -653,7 +653,7 @@ class GatewayCreate(BaseModelWithConfig):
     auth_header_value: Optional[str] = Field(None, description="Value for custom headers authentication")
 
     # Adding `auth_value` as an alias for better access post-validation
-    auth_value: Optional[str] = None
+    auth_value: Optional[str] = Field(None, description="Encoded authentication string")
 
     @validator("url", pre=True)
     def ensure_url_scheme(cls, v: str) -> str:
@@ -672,7 +672,7 @@ class GatewayCreate(BaseModelWithConfig):
         return v
 
     @validator("auth_value", pre=True, always=True)
-    def create_auth_value(cls, v, values):
+    def create_auth_value(cls, v: Optional[str], values: Dict[str, Any]) -> Optional[str]:
         """
         This validator will run before the model is fully instantiated (pre=True)
         It will process the auth fields based on auth_type and generate auth_value.
@@ -695,7 +695,7 @@ class GatewayCreate(BaseModelWithConfig):
         return auth_value
 
     @staticmethod
-    def _process_auth_fields(values: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _process_auth_fields(values: Dict[str, Any]) -> Optional[str]:
         """
         Processes the input authentication fields and returns the correct auth_value.
         This method is called based on the selected auth_type.
@@ -755,7 +755,6 @@ class GatewayUpdate(BaseModelWithConfig):
     description: Optional[str] = Field(None, description="Gateway description")
     transport: str = Field(default="SSE", description="Transport used by MCP server: SSE or STREAMABLEHTTP")
 
-    name: Optional[str] = Field(None, description="Unique name for the prompt")
     # Authorizations
     auth_type: Optional[str] = Field(None, description="auth_type: basic, bearer, headers or None")
     auth_username: Optional[str] = Field(None, description="username for basic authentication")
@@ -765,7 +764,7 @@ class GatewayUpdate(BaseModelWithConfig):
     auth_header_value: Optional[str] = Field(None, description="vallue for custom headers authentication")
 
     # Adding `auth_value` as an alias for better access post-validation
-    auth_value: Optional[str] = None
+    auth_value: Optional[str] = Field(None, description="Encoded authentication string")
 
     @validator("url", pre=True)
     def ensure_url_scheme(cls, v: Optional[str]) -> Optional[str]:
@@ -783,7 +782,7 @@ class GatewayUpdate(BaseModelWithConfig):
         return v
 
     @validator("auth_value", pre=True, always=True)
-    def create_auth_value(cls, v, values):
+    def create_auth_value(cls, v: Optional[str], values: Dict[str, Any]) -> Optional[str]:
         """
         This validator will run before the model is fully instantiated (pre=True)
         It will process the auth fields based on auth_type and generate auth_value.
@@ -806,7 +805,7 @@ class GatewayUpdate(BaseModelWithConfig):
         return auth_value
 
     @staticmethod
-    def _process_auth_fields(values: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _process_auth_fields(values: Dict[str, Any]) -> Optional[str]:
         """
         Processes the input authentication fields and returns the correct auth_value.
         This method is called based on the selected auth_type.
@@ -899,31 +898,42 @@ class GatewayRead(BaseModelWithConfig):
 
     # This will be the main method to automatically populate fields
     @model_validator(mode="after")
-    def _populate_auth(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        auth_type = values.auth_type
-        auth_value_encoded = values.auth_value
-        auth_value = decode_auth(auth_value_encoded)
-        if auth_type == "basic":
-            u = auth_value.get("username")
-            p = auth_value.get("password")
-            if not u or not p:
-                raise ValueError("basic auth requires both username and password")
-            values.auth_username, values.auth_password = u, p
+    def _populate_auth(cls, model: 'GatewayRead') -> 'GatewayRead':
+        auth_type = model.auth_type
+        auth_value_encoded = model.auth_value # This is an encoded string or None
 
-        elif auth_type == "bearer":
-            auth = auth_value.get("Authorization")
-            if not (isinstance(auth, str) and auth.startswith("Bearer ")):
-                raise ValueError("bearer auth requires an Authorization header of the form 'Bearer <token>'")
-            values.auth_token = auth.removeprefix("Bearer ")
+        if auth_type and auth_value_encoded: # Proceed only if auth is configured
+            auth_value_decoded = decode_auth(auth_value_encoded) # This returns a Dict[Any, Any] or None
 
-        elif auth_type == "authheaders":
-            # must be exactly one header
-            if len(auth_value) != 1:
-                raise ValueError("authheaders requires exactly one key/value pair")
-            k, v = next(iter(auth_value.items()))
-            values.auth_header_key, values.auth_header_value = k, v
+            if not isinstance(auth_value_decoded, dict):
+                if auth_type in ["basic", "bearer", "authheaders"]:
+                    raise ValueError(f"Decoded auth_value is not a dictionary for auth_type '{auth_type}'")
+                # If auth_type is None or some other type not expecting a dict,
+                # and auth_value_decoded is also None (from decode_auth(None)), this is fine.
+                # Or if auth_value_decoded is not a dict for an auth_type that doesn't require it.
+                return model
 
-        return values
+            if auth_type == "basic":
+                u = auth_value_decoded.get("username")
+                p = auth_value_decoded.get("password")
+                if not u or not p:
+                    raise ValueError("Basic auth requires both username and password in decoded auth_value")
+                model.auth_username = str(u)
+                model.auth_password = str(p)
+
+            elif auth_type == "bearer":
+                auth_header = auth_value_decoded.get("Authorization")
+                if not (isinstance(auth_header, str) and auth_header.startswith("Bearer ")):
+                    raise ValueError("Bearer auth requires an Authorization header of the form 'Bearer <token>' in decoded auth_value")
+                model.auth_token = auth_header.removeprefix("Bearer ")
+
+            elif auth_type == "authheaders":
+                if len(auth_value_decoded) != 1:
+                    raise ValueError("Authheaders requires exactly one key/value pair in decoded auth_value")
+                k, v = next(iter(auth_value_decoded.items()))
+                model.auth_header_key = str(k)
+                model.auth_header_value = str(v)
+        return model
 
 
 class FederatedTool(BaseModelWithConfig):

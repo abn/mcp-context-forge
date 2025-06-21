@@ -10,15 +10,17 @@ Authors: Mihai Criveti
 import asyncio
 import logging
 from datetime import datetime
+from typing import Any, List, AsyncGenerator, Dict
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 
 from mcpgateway.services.logging_service import LoggingService  # noqa: E402
 from mcpgateway.types import LogLevel  # noqa: E402
 
 
 @pytest.mark.asyncio
-async def test_should_log_default_levels():
+async def test_should_log_default_levels() -> None:
     service = LoggingService()
     # Default level is INFO
     assert not service._should_log(LogLevel.DEBUG)
@@ -27,7 +29,7 @@ async def test_should_log_default_levels():
 
 
 @pytest.mark.asyncio
-async def test_get_logger_sets_level_and_reuses_instance():
+async def test_get_logger_sets_level_and_reuses_instance() -> None:
     service = LoggingService()
     # Default level INFO
     logger1 = service.get_logger("test")
@@ -44,7 +46,7 @@ async def test_get_logger_sets_level_and_reuses_instance():
 
 
 @pytest.mark.asyncio
-async def test_notify_without_subscribers_logs_via_standard_logging(caplog):
+async def test_notify_without_subscribers_logs_via_standard_logging(caplog: LogCaptureFixture) -> None:
     service = LoggingService()
     caplog.set_level(logging.INFO)
     # No subscribers: should not raise
@@ -54,15 +56,15 @@ async def test_notify_without_subscribers_logs_via_standard_logging(caplog):
 
 
 @pytest.mark.asyncio
-async def test_notify_below_threshold_does_not_send_to_subscribers():
+async def test_notify_below_threshold_does_not_send_to_subscribers() -> None:
     service = LoggingService()
-    events = []
+    events: List[Dict[str, Any]] = []
 
-    async def subscriber():
+    async def subscriber() -> None:
         async for msg in service.subscribe():
             events.append(msg)
 
-    task = asyncio.create_task(subscriber())
+    task: asyncio.Task[None] = asyncio.create_task(subscriber())
     # Send DEBUG while level is INFO: should be skipped
     await service.notify("debug msg", LogLevel.DEBUG)
     # Give a moment for any (unexpected) deliveries
@@ -75,16 +77,16 @@ async def test_notify_below_threshold_does_not_send_to_subscribers():
 
 
 @pytest.mark.asyncio
-async def test_notify_and_subscribe_receive_message_with_metadata():
+async def test_notify_and_subscribe_receive_message_with_metadata() -> None:
     service = LoggingService()
-    events = []
+    events: List[Dict[str, Any]] = []
 
-    async def subscriber():
+    async def subscriber() -> None:
         async for msg in service.subscribe():
             events.append(msg)
             break
 
-    task = asyncio.create_task(subscriber())
+    task: asyncio.Task[None] = asyncio.create_task(subscriber())
     await service.notify("hello world", LogLevel.INFO, logger_name="mylogger")
     await asyncio.wait_for(task, timeout=1.0)
 
@@ -92,7 +94,7 @@ async def test_notify_and_subscribe_receive_message_with_metadata():
     evt = events[0]
     # Check structure
     assert evt["type"] == "log"
-    data = evt["data"]
+    data: Dict[str, Any] = evt["data"]
     assert data["level"] == LogLevel.INFO
     assert data["data"] == "hello world"
     # Timestamp is ISO-format parsable
@@ -105,16 +107,16 @@ async def test_notify_and_subscribe_receive_message_with_metadata():
 
 
 @pytest.mark.asyncio
-async def test_set_level_updates_all_loggers_and_sends_info_notification():
+async def test_set_level_updates_all_loggers_and_sends_info_notification() -> None:
     service = LoggingService()
-    events = []
+    events: List[Dict[str, Any]] = []
 
-    async def subscriber():
+    async def subscriber() -> None:
         async for msg in service.subscribe():
             events.append(msg)
             break
 
-    task = asyncio.create_task(subscriber())
+    task: asyncio.Task[None] = asyncio.create_task(subscriber())
     # Set to WARNING
     await service.set_level(LogLevel.WARNING)
     await asyncio.wait_for(task, timeout=1.0)
@@ -123,7 +125,7 @@ async def test_set_level_updates_all_loggers_and_sends_info_notification():
     assert len(events) == 1
     evt = events[0]
     assert evt["type"] == "log"
-    data = evt["data"]
+    data: Dict[str, Any] = evt["data"]
     assert data["level"] == LogLevel.INFO
     assert "Log level set to WARNING" in data["data"]
 
@@ -137,14 +139,14 @@ async def test_set_level_updates_all_loggers_and_sends_info_notification():
 
 
 @pytest.mark.asyncio
-async def test_subscribe_cleanup_removes_queue_on_cancel():
+async def test_subscribe_cleanup_removes_queue_on_cancel() -> None:
     service = LoggingService()
     # No subscribers initially
     assert len(service._subscribers) == 0
 
     # Start subscription but don't yield any events
-    agen = service.subscribe()
-    task = asyncio.create_task(agen.__anext__())
+    agen: AsyncGenerator[Dict[str, Any], None] = service.subscribe()
+    task: asyncio.Task[Any] = asyncio.create_task(agen.__anext__())
 
     # Subscriber should be registered
     await asyncio.sleep(0)  # allow subscription setup

@@ -38,6 +38,15 @@ class Transport(ABC):
         Yields:
             Received messages
         """
+        # This is an abstract method, implementations will be async generators using 'yield'.
+        # No body needed for an abstract async generator method, the signature is the contract.
+        # For MyPy to be happy with an abstract async generator, it needs to know it's meant to be implemented with yield.
+        # An explicit `pass` or `...` is fine here.
+        # However, to ensure it's recognized as an async generator function by MyPy
+        # in the abstract class itself, we can add a type-ignored yield if necessary,
+        # but usually not required for abstract methods. The `async def` and `-> AsyncGenerator` is key.
+        ...
+
 
     @abstractmethod
     async def is_connected(self) -> bool:
